@@ -57,6 +57,25 @@ models:
       - name: evaluated_processes
         data_tests: [not_null, positive]
 
+
+  - name: indicator_lp01_supplier_concentration
+    description: >
+      LP01 Unusual supplier concentration (own indicator). One row per buyer and CPC
+      division with enough awards: the top supplier, its share of the buyer's awards,
+      and how often it wins from comparable buyers (leave-one-out). A risk signal, not
+      evidence of wrongdoing. See docs/indicators/lp01-supplier-concentration.md.
+    data_tests:
+      - unique:
+          arguments:
+            column_name: "buyer_id || '|' || cpc_division"
+    columns:
+      - name: supplier_key
+        data_tests: [not_null]
+      - name: top_share
+        data_tests: [not_null, positive]
+      - name: flagged
+        data_tests: [not_null]
+
 unit_tests:
   - name: r018_buyers_are_compared_with_others_only
     description: >
@@ -180,3 +199,45 @@ unit_tests:
       rows:
         - {buyer_id: E, short_period_processes: 2, p_value: 0.0, enough_data: true, significant: false}
         - {buyer_id: F, short_period_processes: 0, p_value: 1.0, enough_data: true, significant: false}
+
+  - name: lp01_favourite_supplier_vs_market_leader
+    description: >
+      Buyer A gives 8 of 10 awards to supplier X, which comparable buyers do not use,
+      in a category where buyers usually spread their awards: flagged. Buyer B spreads
+      its awards: not flagged. Buyers C and D buy everything from Y, which every buyer
+      uses (a market leader or sole provider): not flagged. Buyers E, F and G each use
+      one local supplier for everything, as is usual in that category: not flagged.
+    model: indicator_lp01_supplier_concentration
+    overrides:
+      vars:
+        lp01_min_awards: 10
+        lp01_min_top_share: 0.5
+        lp01_min_baseline: 30
+        lp01_min_peer_cells: 1
+        fdr_alpha: 0.05
+        min_flagged_for_significance: 3
+    given:
+      - input: ref('int_buyer_supplier_wins')
+        format: sql
+        rows: |
+          select buyer_id, buyer_id as buyer_name, 'P' as buyer_region, cpc_division,
+                 supplier_key, 'private_company' as supplier_type,
+                 supplier_key as supplier_name, wins::decimal(18, 4) as wins,
+                 (wins * 1000)::decimal(18, 2) as awarded_amount
+          from (values
+              ('A', '43', 'X', 8), ('A', '43', 'Z1', 2),
+              ('B', '43', 'Z1', 5), ('B', '43', 'Z2', 5), ('B', '43', 'Z3', 5),
+              ('B', '43', 'Z4', 5), ('B', '43', 'Z5', 5), ('B', '43', 'Z6', 5),
+              ('B', '43', 'Z7', 5), ('B', '43', 'Z8', 5),
+              ('C', '17', 'Y', 10), ('D', '17', 'Y', 40),
+              ('E', '63', 'E1', 10), ('F', '63', 'F1', 10), ('G', '63', 'G1', 10)
+          ) as t(buyer_id, cpc_division, supplier_key, wins)
+    expect:
+      rows:
+        - {buyer_id: A, cpc_division: "43", supplier_key: X, top_share: 0.8, flagged: true}
+        - {buyer_id: B, cpc_division: "43", supplier_key: Z1, top_share: 0.125, flagged: false}
+        - {buyer_id: C, cpc_division: "17", supplier_key: Y, top_share: 1.0, flagged: false}
+        - {buyer_id: D, cpc_division: "17", supplier_key: Y, top_share: 1.0, flagged: false}
+        - {buyer_id: E, cpc_division: "63", supplier_key: E1, top_share: 1.0, flagged: false}
+        - {buyer_id: F, cpc_division: "63", supplier_key: F1, top_share: 1.0, flagged: false}
+        - {buyer_id: G, cpc_division: "63", supplier_key: G1, top_share: 1.0, flagged: false}
