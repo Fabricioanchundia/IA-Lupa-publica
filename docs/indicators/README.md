@@ -9,10 +9,12 @@ and limitations.
 |---|---|---|---|---|
 | R003 | Short submission period | `gold.indicator_r003_short_period` | `gold.buyer_r003_summary` | [r003-short-period.md](r003-short-period.md) |
 | R018 | Single bid received | `gold.indicator_r018_single_bid` | `gold.buyer_r018_summary` | [r018-single-bid.md](r018-single-bid.md) |
+| LP01 | Unusual supplier concentration (own) | — | `gold.indicator_lp01_supplier_concentration` (buyer × CPC division) | [lp01-supplier-concentration.md](lp01-supplier-concentration.md) |
 
-Codes follow the Open Contracting Partnership's red flags as implemented in
+R codes follow the Open Contracting Partnership's red flags as implemented in
 [Cardinal](https://cardinal.readthedocs.io/en/latest/cli/indicators/), so results can be
-checked against an independent implementation.
+checked against an independent implementation. LP codes are Lupa Pública's own
+indicators, for patterns Cardinal does not cover.
 
 ## How buyers are compared (all indicators)
 
