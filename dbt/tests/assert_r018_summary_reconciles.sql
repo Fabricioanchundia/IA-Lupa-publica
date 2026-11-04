@@ -22,3 +22,4 @@ from {{ ref('buyer_r018_summary') }}
 where single_bid_processes > evaluated_processes
    or single_bid_rate not between 0 and 1
    or expected_rate not between 0 and 1
+   or cpc_baseline_share not between 0 and 1

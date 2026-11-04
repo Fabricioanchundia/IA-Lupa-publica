@@ -1,0 +1,8 @@
+models:
+  - name: int_process_main_cpc
+    description: Main CPC division (2 digits) of each process with items, by value.
+    columns:
+      - name: ocid
+        data_tests: [not_null, unique]
+      - name: main_cpc_division
+        data_tests: [not_null]
