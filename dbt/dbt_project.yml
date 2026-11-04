@@ -41,6 +41,11 @@ vars:
   # A procedure type needs this many processes for its percentile to be meaningful.
   r003_min_group: 100
   r003_min_processes: 20
+  r003_min_baseline: 30
+  # Buyer summaries: flag as significant when the false discovery rate q-value is below this.
+  fdr_alpha: 0.05
+  # One or two events never make a pattern, however unlikely they look.
+  min_flagged_for_significance: 3
 
 seeds:
   lupa_publica:

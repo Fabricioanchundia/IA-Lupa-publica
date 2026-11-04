@@ -26,15 +26,36 @@ type_totals as (
     group by all
 ),
 
+buyer_total as (
+    select buyer_id, sum(n) as n, sum(short) as short
+    from buyer_type
+    group by all
+),
+
+overall as (
+    select sum(n) as n, sum(short) as short from buyer_type
+),
+
+-- Expected rate from OTHER buyers of the same procedure type; if they have too few
+-- processes, from all other buyers.
 expected as (
     select
         bt.buyer_id,
         bt.n,
         bt.short,
-        bt.n * coalesce((tt.short - bt.short) / nullif(tt.n - bt.n, 0), 0) as expected_short
+        bt.n * coalesce(
+            case
+                when tt.n - bt.n >= {{ var('r003_min_baseline') }}
+                    then (tt.short - bt.short) / (tt.n - bt.n)
+                else (o.short - btot.short) / nullif(o.n - btot.n, 0)
+            end,
+            0
+        ) as expected_short
     from buyer_type as bt
     inner join type_totals as tt
         on bt.procedure_type is not distinct from tt.procedure_type
+    inner join buyer_total as btot on bt.buyer_id = btot.buyer_id
+    cross join overall as o
 ),
 
 per_buyer as (
@@ -54,17 +75,35 @@ names as (
         arg_max(buyer_region, source_month) as buyer_region
     from evaluated
     group by buyer_id
+),
+
+scored as (
+    select
+        p.buyer_id,
+        nm.buyer_name,
+        nm.buyer_region,
+        p.evaluated_processes,
+        p.short_period_processes,
+        round(p.short_period_processes / p.evaluated_processes, 4) as short_period_rate,
+        round(p.expected_short / p.evaluated_processes, 4) as expected_rate,
+        round(p.short_period_processes / nullif(p.expected_short, 0), 2) as observed_to_expected,
+        {{ poisson_upper_tail('p.short_period_processes', 'p.expected_short') }} as p_value,
+        p.evaluated_processes >= {{ var('r003_min_processes') }} as enough_data
+    from per_buyer as p
+    inner join names as nm on p.buyer_id = nm.buyer_id
+),
+
+tested as (
+    {{ benjamini_hochberg('scored', 'p_value', 'enough_data', 'buyer_id') }}
 )
 
 select
-    p.buyer_id,
-    nm.buyer_name,
-    nm.buyer_region,
-    p.evaluated_processes,
-    p.short_period_processes,
-    round(p.short_period_processes / p.evaluated_processes, 4) as short_period_rate,
-    round(p.expected_short / p.evaluated_processes, 4) as expected_rate,
-    round(p.short_period_processes / nullif(p.expected_short, 0), 2) as observed_to_expected,
-    p.evaluated_processes >= {{ var('r003_min_processes') }} as enough_data
-from per_buyer as p
-inner join names as nm on p.buyer_id = nm.buyer_id
+    * exclude (p_value, q_value),
+    round(p_value, 6) as p_value,
+    round(q_value, 6) as q_value,
+    coalesce(
+        q_value < {{ var('fdr_alpha') }}
+        and short_period_processes >= {{ var('min_flagged_for_significance') }},
+        false
+    ) as significant
+from tested

@@ -126,20 +126,38 @@ names as (
         arg_max(buyer_region, source_month) as buyer_region
     from evaluated
     group by buyer_id
+),
+
+scored as (
+    select
+        p.buyer_id,
+        nm.buyer_name,
+        nm.buyer_region,
+        p.evaluated_processes,
+        p.single_bid_processes,
+        round(p.single_bid_processes / p.evaluated_processes, 4) as single_bid_rate,
+        round(p.expected_single_bid / p.evaluated_processes, 4) as expected_rate,
+        round(p.single_bid_processes / nullif(p.expected_single_bid, 0), 2) as observed_to_expected,
+        round(p.single_bid_processes / nullif(p.expected_single_bid_by_type, 0), 2)
+            as observed_to_expected_by_type,
+        round(p.processes_with_cpc_baseline / p.evaluated_processes, 4) as cpc_baseline_share,
+        {{ poisson_upper_tail('p.single_bid_processes', 'p.expected_single_bid') }} as p_value,
+        p.evaluated_processes >= {{ var('r018_min_processes') }} as enough_data
+    from per_buyer as p
+    inner join names as nm on p.buyer_id = nm.buyer_id
+),
+
+tested as (
+    {{ benjamini_hochberg('scored', 'p_value', 'enough_data', 'buyer_id') }}
 )
 
 select
-    p.buyer_id,
-    nm.buyer_name,
-    nm.buyer_region,
-    p.evaluated_processes,
-    p.single_bid_processes,
-    round(p.single_bid_processes / p.evaluated_processes, 4) as single_bid_rate,
-    round(p.expected_single_bid / p.evaluated_processes, 4) as expected_rate,
-    round(p.single_bid_processes / nullif(p.expected_single_bid, 0), 2) as observed_to_expected,
-    round(p.single_bid_processes / nullif(p.expected_single_bid_by_type, 0), 2)
-        as observed_to_expected_by_type,
-    round(p.processes_with_cpc_baseline / p.evaluated_processes, 4) as cpc_baseline_share,
-    p.evaluated_processes >= {{ var('r018_min_processes') }} as enough_data
-from per_buyer as p
-inner join names as nm on p.buyer_id = nm.buyer_id
+    * exclude (p_value, q_value),
+    round(p_value, 6) as p_value,
+    round(q_value, 6) as q_value,
+    coalesce(
+        q_value < {{ var('fdr_alpha') }}
+        and single_bid_processes >= {{ var('min_flagged_for_significance') }},
+        false
+    ) as significant
+from tested
