@@ -69,6 +69,8 @@ Output columns:
 - `enough_data`: true only with at least 20 evaluated processes (dbt var
   `r018_min_processes`). One process with one bid is a 100% rate and means nothing.
   **Rankings and maps must only use buyers with `enough_data = true`.**
+- `p_value`, `q_value` and `significant`: whether the excess could be chance, corrected
+  for comparing many buyers at once. See [README](README.md).
 
 ## Legitimate causes of a single bid
 

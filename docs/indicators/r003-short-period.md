@@ -83,8 +83,8 @@ and marks `enough_data` from 20 evaluated processes (var `r003_min_processes`).
 ## Limitations
 
 - Ratios are unstable when the expected count is tiny: with an expected 0.15 short
-  periods, a single one gives a ratio near 7. One event is not a pattern; a statistical
-  test for buyer summaries is planned.
+  periods, a single one gives a ratio near 7. One event is not a pattern: use
+  `significant` (statistical test, see [README](README.md)) rather than the ratio alone.
 
 - A relative threshold flags the shortest periods of each type even if every process
   met the law. Legal minimums with citations should replace or complement it.

@@ -119,3 +119,64 @@ unit_tests:
         - {ocid: c, tender_days: 12, threshold_days: 10, flagged: false}
         - {ocid: d, tender_days: 14, threshold_days: 10, flagged: false}
         - {ocid: e, tender_days: 15, threshold_days: 10, flagged: false}
+
+  - name: r003_significance_needs_evidence_beyond_chance
+    description: >
+      Buyer A has 14 short periods where about 0.4 are expected: significant.
+      Buyer B has 1 where 60 are expected: not significant. Buyer C has too few
+      processes to be ranked. Uses the fallback to all other buyers for B, whose
+      procedure type has fewer than 30 processes from other buyers.
+    model: buyer_r003_summary
+    overrides:
+      vars:
+        r003_min_processes: 20
+        r003_min_baseline: 30
+        fdr_alpha: 0.05
+        min_flagged_for_significance: 3
+    given:
+      - input: ref('indicator_r003_short_period')
+        format: sql
+        rows: |
+          select
+              'p' || buyer || i as ocid, '2025-01' as source_month, buyer as buyer_id,
+              buyer as buyer_name, null::varchar as buyer_region, 'open' as procurement_method,
+              'Licitación' as procurement_method_details,
+              null::timestamptz as tender_period_start, null::timestamptz as tender_period_end,
+              10 as tender_days, 8 as threshold_days, 14.0 as group_median_days,
+              125 as group_processes, i <= short as flagged
+          from (values ('A', 20, 14), ('B', 100, 1), ('C', 5, 1)) as b(buyer, n, short),
+               range(1, n + 1) as r(i)
+    expect:
+      rows:
+        - {buyer_id: A, short_period_processes: 14, enough_data: true, significant: true}
+        - {buyer_id: B, short_period_processes: 1, enough_data: true, significant: false}
+        - {buyer_id: C, short_period_processes: 1, enough_data: false, significant: false}
+
+  - name: r003_two_events_are_never_significant
+    description: >
+      Buyer E has 2 short periods where other buyers have none (expected 0, so the
+      Poisson probability is 0), but two events are below min_flagged_for_significance.
+    model: buyer_r003_summary
+    overrides:
+      vars:
+        r003_min_processes: 20
+        r003_min_baseline: 30
+        fdr_alpha: 0.05
+        min_flagged_for_significance: 3
+    given:
+      - input: ref('indicator_r003_short_period')
+        format: sql
+        rows: |
+          select
+              'p' || buyer || i as ocid, '2025-01' as source_month, buyer as buyer_id,
+              buyer as buyer_name, null::varchar as buyer_region, 'open' as procurement_method,
+              'Cotización' as procurement_method_details,
+              null::timestamptz as tender_period_start, null::timestamptz as tender_period_end,
+              10 as tender_days, 8 as threshold_days, 14.0 as group_median_days,
+              220 as group_processes, i <= short as flagged
+          from (values ('E', 20, 2), ('F', 200, 0)) as b(buyer, n, short),
+               range(1, n + 1) as r(i)
+    expect:
+      rows:
+        - {buyer_id: E, short_period_processes: 2, p_value: 0.0, enough_data: true, significant: false}
+        - {buyer_id: F, short_period_processes: 0, p_value: 1.0, enough_data: true, significant: false}
