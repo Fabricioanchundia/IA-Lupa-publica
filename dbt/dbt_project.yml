@@ -53,6 +53,9 @@ vars:
   lp02_max_spread: 5         # p90/p10 of buyers' median prices; above it, products differ
   lp02_min_ratio: 3          # price at least 3x the reference price...
   lp02_min_robust_z: 3.5     # ...and a robust outlier (Iglewicz-Hoaglin threshold)
+  # Review priority per buyer: significant excess of at least this observed/expected ratio.
+  priority_high_ratio: 2.0
+  priority_medium_ratio: 1.5
   # Buyer summaries: flag as significant when the false discovery rate q-value is below this.
   fdr_alpha: 0.05
   # One or two events never make a pattern, however unlikely they look.

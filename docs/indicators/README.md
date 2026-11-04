@@ -39,6 +39,40 @@ indicators, for patterns Cardinal does not cover.
 chance.** It still does not say why. Context (urgency, specialized markets, remote areas,
 electoral calendars) can explain it, and is what a reviewer should check first.
 
+## Review priority per buyer
+
+`gold.buyer_review_priority` puts the **public** indicators side by side (LP02 is
+experimental and excluded) and assigns a **priority for review**: where a journalist or
+auditor could look first, and why. It is not a risk score and not a judgement.
+
+Level of each indicator for a buyer (R018, R003):
+
+| Level | Meaning |
+|---|---|
+| `high` | significant **and** at least 2× the expected count (var `priority_high_ratio`) |
+| `medium` | significant **and** at least 1.5× (var `priority_medium_ratio`) |
+| `low` | significant but a small excess: real, probably not important |
+| `none` | not significant |
+| `insufficient_data` | fewer than 20 evaluated processes |
+
+LP01 is `signal` when at least one CPC division of the buyer is flagged.
+
+Both conditions are needed because they answer different questions: the ratio says how
+big the excess is, significance says how sure we are that it is not chance. A large
+excess on few processes can be luck; a small excess on hundreds of processes can be
+certain but unimportant.
+
+| `review_priority` | Rule |
+|---|---|
+| `review_first` | a `high` level, or signals on 2 or more indicators |
+| `review` | a signal (`high`/`medium`, or LP01 `signal`) on exactly 1 indicator |
+| `no_signal` | enough data on at least one indicator, no signal |
+| `insufficient_data` | not enough data on any indicator |
+
+A dbt unit test (`review_priority_needs_effect_and_significance`) checks these rules.
+Context still comes first: for example the national electoral council is `review_first`
+on R003, most likely because of the electoral calendar.
+
 ## How to communicate results
 
 Use: "received a single bid in X of Y processes", "more than comparable processes",
