@@ -12,6 +12,7 @@ from lupa_publica.export import PublicDataError, export_public
 from lupa_publica.extract import Month
 from lupa_publica.lock import AlreadyRunningError, exclusive_lock
 from lupa_publica.pipeline import DataPaths, IngestResult, ingest, last_months, month_range
+from lupa_publica.privacy import MissingKeyError
 from lupa_publica.report import build_report, render_markdown
 
 
@@ -48,17 +49,15 @@ def build_parser() -> argparse.ArgumentParser:
     export_cmd = commands.add_parser(
         "export-public", help="write the public datasets for the website (allowlist)"
     )
-    export_cmd.add_argument(
-        "--output", type=Path, help="output folder (default: <data-dir>/public)"
-    )
+    export_cmd.add_argument("--output", type=Path, help="output folder (default: web/public/data)")
     return parser
 
 
 def run_export(paths: DataPaths, output: Path | None) -> int:
-    out_dir = output or paths.root / "public"
+    out_dir = output or Path("web/public/data")
     try:
         report = export_public(paths.db, out_dir)
-    except PublicDataError as exc:
+    except (PublicDataError, MissingKeyError) as exc:
         print(f"export refused: {exc}")
         return 1
     for name, rows in report.rows.items():
