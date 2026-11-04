@@ -22,6 +22,16 @@ models:
     silver:
       +materialized: table
       +schema: silver
+    gold:
+      # Risk indicators and aggregates. Signals to prioritize review, never accusations.
+      +materialized: table
+      +schema: gold
+
+vars:
+  # R018 Single bid received: competitive methods evaluated (Cardinal default: open|selective).
+  r018_procurement_methods: ["open", "selective"]
+  # A buyer's single-bid rate is only reliable with enough evaluated processes.
+  r018_min_processes: 20
 
 seeds:
   lupa_publica:
