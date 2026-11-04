@@ -12,6 +12,10 @@ with processes as (
     select * from {{ ref('processes') }}
 ),
 
+main_cpc as (
+    select * from {{ ref('int_process_main_cpc') }}
+),
+
 awarded as (
     select ocid, sum(award_amount) as awarded_amount
     from {{ ref('stg_awards') }}
@@ -26,12 +30,14 @@ select
     p.buyer_region,
     p.procurement_method,
     p.procurement_method_details,
+    c.main_cpc_division,
     p.number_of_tenderers,
     p.tender_amount,
     a.awarded_amount,
     p.number_of_tenderers = 1 as flagged
 from processes as p
 left join awarded as a on p.ocid = a.ocid
+left join main_cpc as c on p.ocid = c.ocid
 where p.procurement_method in (
         {%- for method in var('r018_procurement_methods') %}
         '{{ method }}'{% if not loop.last %},{% endif %}

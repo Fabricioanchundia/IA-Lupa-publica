@@ -26,3 +26,36 @@ models:
         data_tests: [not_null, unique]
       - name: evaluated_processes
         data_tests: [not_null, positive]
+
+unit_tests:
+  - name: r018_buyers_are_compared_with_others_only
+    description: >
+      Leave-one-out baselines: each buyer's expected rate comes from OTHER buyers'
+      processes of the same procedure type and CPC division, falling back to the
+      procedure type when the CPC group is too small.
+    model: buyer_r018_summary
+    overrides:
+      vars:
+        r018_min_baseline: 2
+        r018_min_processes: 1
+    given:
+      - input: ref('indicator_r018_single_bid')
+        rows:
+          # Buyer A: 2 processes in (Subasta, CPC 43), both single bid.
+          - {buyer_id: A, buyer_name: A, source_month: "2025-01", procurement_method_details: Subasta, main_cpc_division: "43", flagged: true}
+          - {buyer_id: A, buyer_name: A, source_month: "2025-01", procurement_method_details: Subasta, main_cpc_division: "43", flagged: true}
+          # Buyer B: 4 processes in the same group, 1 single bid.
+          - {buyer_id: B, buyer_name: B, source_month: "2025-01", procurement_method_details: Subasta, main_cpc_division: "43", flagged: true}
+          - {buyer_id: B, buyer_name: B, source_month: "2025-01", procurement_method_details: Subasta, main_cpc_division: "43", flagged: false}
+          - {buyer_id: B, buyer_name: B, source_month: "2025-01", procurement_method_details: Subasta, main_cpc_division: "43", flagged: false}
+          - {buyer_id: B, buyer_name: B, source_month: "2025-01", procurement_method_details: Subasta, main_cpc_division: "43", flagged: false}
+          # Buyer C: alone in (Subasta, CPC 28), so it falls back to the procedure type.
+          - {buyer_id: C, buyer_name: C, source_month: "2025-01", procurement_method_details: Subasta, main_cpc_division: "28", flagged: false}
+    expect:
+      rows:
+        # A vs B's group rate 1/4: expected 0.5, observed 2 -> 4x.
+        - {buyer_id: A, single_bid_processes: 2, expected_rate: 0.25, observed_to_expected: 4.0, cpc_baseline_share: 1.0}
+        # B vs A's group rate 2/2: expected 4, observed 1 -> 0.25x.
+        - {buyer_id: B, single_bid_processes: 1, expected_rate: 1.0, observed_to_expected: 0.25, cpc_baseline_share: 1.0}
+        # C: no other buyer in CPC 28 -> type rate from A and B, 3/6.
+        - {buyer_id: C, single_bid_processes: 0, expected_rate: 0.5, observed_to_expected: 0.0, cpc_baseline_share: 0.0}

@@ -32,6 +32,8 @@ vars:
   r018_procurement_methods: ["open", "selective"]
   # A buyer's single-bid rate is only reliable with enough evaluated processes.
   r018_min_processes: 20
+  # Minimum processes from OTHER buyers for a comparison group (baseline) to be used.
+  r018_min_baseline: 30
 
 seeds:
   lupa_publica:

@@ -39,14 +39,34 @@ months with very few processes (January, and the latest month) swing much more.
 
 ## Comparing buyers fairly
 
-Single bids are more common in some procedure types everywhere (insurance tenders: 36.5%).
-A raw rate would penalize buyers for **what** they buy, so `buyer_r018_summary` also
-computes an **expected** count: the sum, over the buyer's processes, of the national
-single-bid rate of each procedure type.
+A raw single-bid rate would penalize buyers for **what** they buy and **how**: insurance
+tenders have 36.5% single bids everywhere, and specialized goods attract few suppliers.
+So `buyer_r018_summary` computes an **expected** number of single bids: for each of the
+buyer's processes, the single-bid rate of comparable processes, added up.
 
-- `observed_to_expected` = single bids / expected single bids. Above 1 means more
-  single bids than comparable processes nationwide.
-- `enough_data` is true only with at least 20 evaluated processes (dbt var
+"Comparable", from most to least specific:
+
+1. Same procedure type **and** same CPC division (`main_cpc_division`: first 2 digits of
+   the CPC code of the process's most valuable item, from `int_process_main_cpc`).
+2. If that group is too small, the same procedure type.
+3. Otherwise, all evaluated processes.
+
+A group is used only if **other buyers** have at least 30 processes in it (dbt var
+`r018_min_baseline`).
+
+**Leave-one-out:** the expected rate always comes from **other** buyers. Otherwise a
+specialized buyer that dominates its own group (e.g. the only big buyer of military
+textiles) would be compared mostly with itself and always look "normal". A dbt unit
+test (`r018_buyers_are_compared_with_others_only`) checks this rule.
+
+Output columns:
+
+- `observed_to_expected`: single bids / expected single bids. Above 1 means more single
+  bids than comparable processes of other buyers.
+- `observed_to_expected_by_type`: the same, comparing only by procedure type (v1), to
+  show how much the CPC adjustment changes the picture.
+- `cpc_baseline_share`: share of the buyer's processes compared at the CPC level.
+- `enough_data`: true only with at least 20 evaluated processes (dbt var
   `r018_min_processes`). One process with one bid is a 100% rate and means nothing.
   **Rankings and maps must only use buyers with `enough_data = true`.**
 
