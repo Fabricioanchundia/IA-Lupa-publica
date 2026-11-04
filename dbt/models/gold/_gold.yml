@@ -1,0 +1,28 @@
+models:
+  - name: indicator_r018_single_bid
+    description: >
+      R018 Single bid received (OCP Cardinal). One row per evaluated process
+      (competitive method, awarded, number of bids known). A risk signal, not evidence
+      of wrongdoing. See docs/indicators/r018-single-bid.md.
+    columns:
+      - name: ocid
+        data_tests: [not_null, unique]
+      - name: procurement_method
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: "{{ var('r018_procurement_methods') }}"
+      - name: number_of_tenderers
+        data_tests: [not_null, positive]
+      - name: flagged
+        data_tests: [not_null]
+
+  - name: buyer_r018_summary
+    description: >
+      Single-bid rate per buyer, with the expected rate for the procedure types it uses.
+      Only buyers with enough_data = true should be shown in rankings.
+    columns:
+      - name: buyer_id
+        data_tests: [not_null, unique]
+      - name: evaluated_processes
+        data_tests: [not_null, positive]
