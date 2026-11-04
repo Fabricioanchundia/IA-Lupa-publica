@@ -34,6 +34,13 @@ vars:
   r018_min_processes: 20
   # Minimum processes from OTHER buyers for a comparison group (baseline) to be used.
   r018_min_baseline: 30
+  # R003 Short submission period: competitive methods evaluated.
+  r003_procurement_methods: ["open", "selective"]
+  # "Short" = below this percentile of the same procedure type (no legal minimums loaded yet).
+  r003_percentile: 0.05
+  # A procedure type needs this many processes for its percentile to be meaningful.
+  r003_min_group: 100
+  r003_min_processes: 20
 
 seeds:
   lupa_publica:
