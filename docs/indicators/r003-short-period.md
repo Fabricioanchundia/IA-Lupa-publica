@@ -50,6 +50,21 @@ Calendar days in the exploration (before the complete-day correction):
 Many Seguros tenders last exactly 14 days (1st, 5th and 25th percentiles), which looks
 like a legal minimum.
 
+## Results (24 months, Nov 2024 – Oct 2026)
+
+The reading of `durationInDays` as complete days held for **all** 16,101 processes with
+both fields (the monitoring test returned 0 rows).
+
+| Procedure type | Evaluated | Threshold (days) | Median | Flagged | 1 day or less |
+|---|---:|---:|---:|---:|---:|
+| Licitación | 8,588 | 8 | 14 | 25 (0.3%) | 3 |
+| Menor Cuantía | 4,266 | 6 | 13 | 87 (2.0%) | 3 |
+| Cotización | 1,919 | 10 | 17 | 33 (1.7%) | 0 |
+| Licitación de Seguros | 1,328 | 14 | 15 | 1 (0.1%) | 0 |
+
+Only 146 processes (0.9%) are flagged, far fewer than 5%: many processes last exactly
+the threshold (probably the legal minimum), and only periods **strictly below** it count.
+
 ## Comparing buyers
 
 `buyer_r003_summary` compares each buyer's share of short periods with the share
@@ -62,10 +77,16 @@ and marks `enough_data` from 20 evaluated processes (var `r003_min_processes`).
 - Data entry errors or corrected dates (periods of 0–1 days are more likely errors than
   real periods).
 - Processes that were cancelled and republished.
+- Fixed external deadlines. Example: the national electoral council has to buy on the
+  electoral calendar set by law, and it tops the buyer ranking (14 of 25 processes).
 
 ## Limitations
 
-- A relative threshold always flags about 5% of each type, even if every process met
-  the law. Legal minimums with citations should replace or complement it.
+- Ratios are unstable when the expected count is tiny: with an expected 0.15 short
+  periods, a single one gives a ratio near 7. One event is not a pattern; a statistical
+  test for buyer summaries is planned.
+
+- A relative threshold flags the shortest periods of each type even if every process
+  met the law. Legal minimums with citations should replace or complement it.
 - No coverage of Subasta Inversa Electrónica, the most common competitive procedure.
 - Only the published period is measured, not when the documents were really available.
