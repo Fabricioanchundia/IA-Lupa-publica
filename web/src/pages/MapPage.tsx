@@ -3,6 +3,7 @@ import { query, type Row } from "../db";
 import { GALAPAGOS_INSET, PROVINCES, VIEWBOX } from "../ecuadorProvinces";
 import { fmtCompactMoney, fmtInt, fmtPercent, provinceName, str, titleCase } from "../format";
 import { href } from "../router";
+import { R018_EVALUATED } from "../sql";
 import { PriorityBadge } from "../signals";
 
 type Metric = { id: string; label: string; legend: string; format: (n: number) => string };
@@ -39,7 +40,7 @@ export default function MapPage() {
     query(`
       with p as (
         select b.buyer_region as region, count(*) as processes, sum(p.amount) as amount,
-               count(*) filter (where p.method in ('open', 'selective', 'limited')) as competitive,
+               count(*) filter (where ${R018_EVALUATED()}) as competitive,
                count(*) filter (where p.single_bid) as single_bid
         from processes as p join buyers as b on p.buyer_id = b.buyer_id
         where b.buyer_region is not null

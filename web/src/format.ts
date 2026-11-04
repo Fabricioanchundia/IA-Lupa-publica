@@ -5,10 +5,11 @@ const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "
 
 export const fmtInt = (n: unknown) => (n == null ? "—" : integer.format(Number(n)));
 export const fmtMoney = (n: unknown) => (n == null ? "—" : `US$ ${integer.format(Number(n))}`);
-/** 1_305_900_000 -> "US$ 1.305,9 M", 737_200 -> "US$ 737,2 mil" */
+/** 12_936_400_000 -> "US$ 12,9 mil M", 152_300_000 -> "US$ 152,3 M", 737_200 -> "US$ 737,2 mil" */
 export const fmtCompactMoney = (n: unknown) => {
   if (n == null) return "—";
   const v = Number(n);
+  if (Math.abs(v) >= 1e9) return `US$ ${decimal.format(v / 1e9)} mil M`;
   if (Math.abs(v) >= 1e6) return `US$ ${decimal.format(v / 1e6)} M`;
   if (Math.abs(v) >= 1e3) return `US$ ${decimal.format(v / 1e3)} mil`;
   return `US$ ${integer.format(v)}`;

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { query, type Row } from "../db";
 import { fmtCompactMoney, fmtInt, fmtMoney, fmtMonth, fmtPercent, provinceName, str, titleCase } from "../format";
 import { href, type Route } from "../router";
+import { PROCEDURE, R018_EVALUATED } from "../sql";
 import { INDICATORS, PRIORITY, PriorityBadge, isSignal, levelLabel } from "../signals";
 
 const PAGE_SIZE = 25;
@@ -153,10 +154,10 @@ function BuyerProfile({ buyerId }: { buyerId: string }) {
       query("select * from buyers where buyer_id = ?", [buyerId]),
       query(
         `select count(*) as processes, sum(amount) as amount,
-                count(*) filter (where method in ('open', 'selective', 'limited')) as competitive,
+                count(*) filter (where ${R018_EVALUATED()}) as competitive,
                 count(*) filter (where single_bid) as single_bid,
                 min(month) as first_month, max(month) as last_month
-         from processes where buyer_id = ?`,
+         from processes as p where buyer_id = ?`,
         [buyerId],
       ),
       query("select * from review_priority where buyer_id = ?", [buyerId]),
@@ -167,7 +168,7 @@ function BuyerProfile({ buyerId }: { buyerId: string }) {
         [buyerId],
       ),
       query(
-        `select p.ocid, p.month, p.title, p.amount, p.procedure, p.supplier_label, p.single_bid, p.short_period
+        `select p.ocid, p.month, p.title, p.amount, ${PROCEDURE()} as procedure, p.supplier_label, p.single_bid, p.short_period
          from processes as p where p.buyer_id = ? order by p.amount desc nulls last limit 8`,
         [buyerId],
       ),
@@ -225,7 +226,7 @@ function BuyerProfile({ buyerId }: { buyerId: string }) {
         <div className="tile"><strong>{fmtCompactMoney(stats.amount)}</strong><span>monto total</span></div>
         <div className="tile">
           <strong>{Number(stats.competitive) ? fmtPercent(Number(stats.single_bid) / Number(stats.competitive)) : "—"}</strong>
-          <span>de sus procesos competitivos con una sola oferta</span>
+          <span>de sus procesos competitivos con ofertas registradas recibió una sola</span>
         </div>
       </div>
 

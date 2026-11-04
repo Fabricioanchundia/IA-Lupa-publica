@@ -3,6 +3,7 @@ import MonthlyBars from "../components/MonthlyBars";
 import { query, type Row } from "../db";
 import { fmtCompactMoney, fmtInt, fmtMonth, fmtPercent, provinceName, titleCase } from "../format";
 import { href } from "../router";
+import { R018_EVALUATED } from "../sql";
 import { INDICATORS, PriorityBadge, reasons } from "../signals";
 
 type Data = { kpi: Row; monthly: Row[]; first: Row[]; counts: Row[] };
@@ -16,11 +17,11 @@ export default function Home() {
       query(`
         select count(*) as processes,
                sum(amount) as amount,
-               count(*) filter (where method in ('open', 'selective', 'limited')) as competitive,
+               count(*) filter (where ${R018_EVALUATED()}) as competitive,
                count(*) filter (where single_bid) as single_bid,
                min(month) as first_month,
                max(month) as last_month
-        from processes`),
+        from processes as p`),
       query("select source_month as month, processes from monthly_coverage order by 1"),
       query(`select * from review_priority where review_priority = 'review_first'
              order by signals desc, greatest(coalesce(r018_ratio, 0), coalesce(r003_ratio, 0)) desc`),
@@ -61,7 +62,7 @@ export default function Home() {
         <Tile value={fmtCompactMoney(k?.amount)} label="monto adjudicado o presupuestado" />
         <Tile
           value={k ? fmtPercent(Number(k.single_bid) / Math.max(1, Number(k.competitive))) : "—"}
-          label="de los procesos competitivos recibió una sola oferta"
+          label="de los procesos competitivos con ofertas registradas recibió una sola"
         />
         <Tile value={data ? fmtInt(count("review_first")) : "—"} label="entidades para revisar primero" accent />
       </div>

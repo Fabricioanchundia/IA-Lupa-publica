@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { query, type Row } from "../db";
 import { fmtCompactMoney, fmtInt, fmtMoney, fmtMonth, provinceName, str, titleCase } from "../format";
 import { href, type Route } from "../router";
+import { PROCEDURE } from "../sql";
 
 const PAGE_SIZE = 25;
 
@@ -34,7 +35,7 @@ function where(f: Filters): [string, unknown[]] {
   }
   if (f.province) { parts.push("b.buyer_region = ?"); params.push(f.province); }
   if (f.year) { parts.push("left(p.month, 4) = ?"); params.push(f.year); }
-  if (f.procedure) { parts.push("p.procedure = ?"); params.push(f.procedure); }
+  if (f.procedure) { parts.push(`${PROCEDURE()} = ?`); params.push(f.procedure); }
   if (f.category) { parts.push("p.cpc_division = ?"); params.push(f.category); }
   if (f.buyer) { parts.push("p.buyer_id = ?"); params.push(f.buyer); }
   if (f.signalsOnly) parts.push("(p.single_bid or p.short_period)");
@@ -63,7 +64,7 @@ export default function Contracts({ route }: { route: Route }) {
     Promise.all([
       query("select distinct buyer_region as v from buyers where buyer_region is not null order by 1"),
       query("select distinct left(month, 4) as v from processes order by 1 desc"),
-      query("select procedure as v, count(*) as n from processes group by 1 order by 2 desc"),
+      query(`select ${PROCEDURE()} as v, count(*) as n from processes as p group by 1 order by 2 desc`),
       query(`select c.cpc_division, c.name, count(*) as n from processes as p
              join cpc_divisions as c on p.cpc_division = c.cpc_division group by 1, 2 order by 2`),
     ]).then(([p, y, t, c]) =>
@@ -105,7 +106,7 @@ export default function Contracts({ route }: { route: Route }) {
       ),
       query(
         `select p.ocid, p.month, p.buyer_id, b.buyer_name, b.buyer_region, p.title, c.name as category,
-                p.supplier_label, p.procedure, p.amount, p.tenderers, p.single_bid, p.short_period
+                p.supplier_label, ${PROCEDURE()} as procedure, p.procedure as procedure_full, p.amount, p.tenderers, p.single_bid, p.short_period
          ${FROM} ${clause}
          order by p.month desc, p.amount desc nulls last limit ${PAGE_SIZE} offset ?`,
         [...params, page * PAGE_SIZE],
@@ -223,7 +224,7 @@ export default function Contracts({ route }: { route: Route }) {
                   </small>
                   <small className="mono">{str(r.ocid)}</small>
                 </td>
-                <td>{str(r.procedure) || "—"}</td>
+                <td title={str(r.procedure_full)}>{str(r.procedure) || "—"}</td>
                 <td className="num">{fmtMoney(r.amount)}</td>
                 <td>
                   {r.single_bid ? <span className="badge" title="Solo un proveedor presentó oferta">Una sola oferta</span> : null}
