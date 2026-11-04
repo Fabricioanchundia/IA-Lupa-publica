@@ -1,0 +1,59 @@
+name: pages
+
+# Publishes the website on GitHub Pages (free for public repositories).
+# The public datasets are NOT in git (they are large build outputs): they are attached to
+# a GitHub Release tagged "data-YYYY-MM-DD" by scripts/publish_data.sh, which then starts
+# this workflow on main. It is not triggered by the release event itself: that run would
+# belong to the tag, and the github-pages environment only accepts deployments from main.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Download the newest public data release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 50 --json tagName \
+                --jq '[.[] | select(.tagName | startswith("data-"))][0].tagName')
+          if [ -z "$tag" ]; then echo "No data-* release found" >&2; exit 1; fi
+          echo "Using data release $tag"
+          mkdir -p web/public/data
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern '*.csv.gz' --dir web/public/data
+          count=$(ls web/public/data/*.csv.gz | wc -l)
+          if [ "$count" -ne 8 ]; then echo "Expected 8 datasets, found $count" >&2; exit 1; fi
+      - name: Build
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

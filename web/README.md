@@ -19,6 +19,21 @@ npm run dev        # http://localhost:5173
 `npm run build` type-checks and writes the site to `web/dist/`; `npm run preview`
 serves that build (with the Content-Security-Policy that the dev server leaves out).
 
+## Publish on GitHub Pages (free for public repositories)
+
+The data files are not committed (they are build outputs, ~8 MB). They travel as a
+GitHub Release instead:
+
+```bash
+set -a && source .env && set +a      # pseudonym key, needed by the export
+uv run lupa export-public             # privacy-checked public datasets
+scripts/publish_data.sh               # release "data-YYYY-MM-DD", then starts the pages workflow
+gh run watch
+```
+
+The `pages` workflow downloads the newest `data-*` release, builds the app and deploys it.
+One-time setup: Settings → Pages → Source: **GitHub Actions**.
+
 ## Pages
 
 | Route | What it shows |
@@ -28,6 +43,7 @@ serves that build (with the Content-Security-Policy that the dev server leaves o
 | `#/entidades` | Entity search; `#/entidades/<buyer_id>` is the entity profile |
 | `#/mapa` | Provinces coloured by a chosen metric, with a ranked table |
 | `#/preguntar` | Placeholder for Phase 7 (questions in Spanish) |
+| `#/acerca` | About, data source, privacy, and how to ask for a correction (right of reply) |
 
 ## Rules
 

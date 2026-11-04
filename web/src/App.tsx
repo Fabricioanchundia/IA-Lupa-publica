@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { whenReady } from "./db";
+import About from "./pages/About";
 import Ask from "./pages/Ask";
 import Contracts from "./pages/Contracts";
 import Entities from "./pages/Entities";
@@ -15,6 +16,7 @@ const SECTIONS: Section[] = [
   { id: "entidades", label: "Entidades", hint: "Ficha de cada institución", view: (r) => <Entities route={r} /> },
   { id: "mapa", label: "Mapa", hint: "Cifras por provincia", view: () => <MapPage /> },
   { id: "preguntar", label: "Preguntar con IA", hint: "Consultas en español", view: () => <Ask /> },
+  { id: "acerca", label: "Acerca de", hint: "Datos, privacidad y contacto", view: () => <About /> },
 ];
 
 export default function App() {
