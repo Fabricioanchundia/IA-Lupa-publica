@@ -48,3 +48,10 @@ def test_refuses_to_start_while_another_run_is_active(
 
     assert exit_code == 1
     assert "already running" in capsys.readouterr().out
+
+
+def test_export_public_accepts_an_output_folder() -> None:
+    args = build_parser().parse_args(["export-public", "--output", "site/data"])
+
+    assert args.command == "export-public"
+    assert str(args.output) == "site/data"
