@@ -1,0 +1,35 @@
+name: Corrección o réplica
+description: Una señal te parece mal explicada o encontraste un error en los datos.
+title: "[Corrección] "
+labels: ["correccion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por escribir. Lo que pongas aquí es **público**: no incluyas cédulas,
+        teléfonos ni datos personales.
+  - type: input
+    id: page
+    attributes:
+      label: Enlace a la página de Lupa Pública
+      description: Copia la dirección de la ficha o del contrato.
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: ¿Qué tipo de pedido es?
+      options:
+        - Una señal está mal explicada o no corresponde
+        - Un dato es incorrecto (monto, fecha, provincia…)
+        - Aparece información personal que no debería
+        - Otro
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Explícanos qué pasa
+      description: Si tienes una fuente (documento del SERCOP, resolución…), pon el enlace.
+    validations:
+      required: true

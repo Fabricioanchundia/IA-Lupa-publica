@@ -287,3 +287,8 @@ td.desc { min-width: 260px; }
 .status-error { border-color: var(--p-high); color: var(--ink); }
 .status-error small { display: block; color: var(--muted); margin-top: 4px; font-family: ui-monospace, monospace; }
 .status code { background: var(--bg); padding: 1px 6px; border-radius: 5px; }
+
+/* ---------- About ---------- */
+.about .grid-2 { margin-top: 20px; }
+.about h2 { margin: 0; font-size: 17px; font-weight: 750; }
+.about .contact { border-color: color-mix(in srgb, var(--brand) 55%, var(--rule)); }
