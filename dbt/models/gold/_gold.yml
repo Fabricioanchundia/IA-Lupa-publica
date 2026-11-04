@@ -105,6 +105,36 @@ models:
       - name: flagged
         data_tests: [not_null]
 
+
+  - name: buyer_review_priority
+    description: >
+      One row per buyer with the public indicators (R018, R003, LP01) side by side and a
+      review priority. A priority for review, not a risk score or a judgement.
+    columns:
+      - name: buyer_id
+        data_tests: [not_null, unique]
+      - name: review_priority
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [review_first, review, no_signal, insufficient_data]
+      - name: r018_level
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: &levels [high, medium, low, none, insufficient_data]
+      - name: r003_level
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: *levels
+      - name: lp01_level
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [signal, none, insufficient_data]
+
 unit_tests:
   - name: r018_buyers_are_compared_with_others_only
     description: >
@@ -338,3 +368,37 @@ unit_tests:
     expect:
       rows:
         - {cpc_code: "111", unit_name: UNIDAD, items: 54, buyers: 5, reference_price: 10.0}
+
+  - name: review_priority_needs_effect_and_significance
+    description: >
+      A: significant and 2.5x on R018 -> high -> review_first. B: significant but 1.2x
+      -> low, no other signal -> no_signal. C: 3x but NOT significant -> none, plus an
+      LP01 signal -> review. D: medium on R018 and an LP01 signal -> review_first.
+      E: too few processes everywhere -> insufficient_data.
+    model: buyer_review_priority
+    overrides:
+      vars:
+        priority_high_ratio: 2.0
+        priority_medium_ratio: 1.5
+    given:
+      - input: ref('buyer_r018_summary')
+        rows:
+          - {buyer_id: A, buyer_name: A, enough_data: true, significant: true, observed_to_expected: 2.5}
+          - {buyer_id: B, buyer_name: B, enough_data: true, significant: true, observed_to_expected: 1.2}
+          - {buyer_id: C, buyer_name: C, enough_data: true, significant: false, observed_to_expected: 3.0}
+          - {buyer_id: D, buyer_name: D, enough_data: true, significant: true, observed_to_expected: 1.7}
+          - {buyer_id: E, buyer_name: E, enough_data: false, significant: false, observed_to_expected: 5.0}
+      - input: ref('buyer_r003_summary')
+        rows:
+          - {buyer_id: A, buyer_name: A, enough_data: true, significant: false, observed_to_expected: 1.0}
+      - input: ref('indicator_lp01_supplier_concentration')
+        rows:
+          - {buyer_id: C, buyer_name: C, cpc_division: "43", flagged: true, top_share: 0.9}
+          - {buyer_id: D, buyer_name: D, cpc_division: "43", flagged: true, top_share: 0.8}
+    expect:
+      rows:
+        - {buyer_id: A, r018_level: high, lp01_level: insufficient_data, review_priority: review_first}
+        - {buyer_id: B, r018_level: low, lp01_level: insufficient_data, review_priority: no_signal}
+        - {buyer_id: C, r018_level: none, lp01_level: signal, review_priority: review}
+        - {buyer_id: D, r018_level: medium, lp01_level: signal, review_priority: review_first}
+        - {buyer_id: E, r018_level: insufficient_data, lp01_level: insufficient_data, review_priority: insufficient_data}
