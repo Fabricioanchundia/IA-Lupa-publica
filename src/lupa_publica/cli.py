@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
 
+from lupa_publica.export import PublicDataError, export_public
 from lupa_publica.extract import Month
 from lupa_publica.lock import AlreadyRunningError, exclusive_lock
 from lupa_publica.pipeline import DataPaths, IngestResult, ingest, last_months, month_range
@@ -44,7 +45,26 @@ def build_parser() -> argparse.ArgumentParser:
     report_cmd.add_argument(
         "--output", type=Path, help="write the report to this file instead of printing it"
     )
+    export_cmd = commands.add_parser(
+        "export-public", help="write the public datasets for the website (allowlist)"
+    )
+    export_cmd.add_argument(
+        "--output", type=Path, help="output folder (default: <data-dir>/public)"
+    )
     return parser
+
+
+def run_export(paths: DataPaths, output: Path | None) -> int:
+    out_dir = output or paths.root / "public"
+    try:
+        report = export_public(paths.db, out_dir)
+    except PublicDataError as exc:
+        print(f"export refused: {exc}")
+        return 1
+    for name, rows in report.rows.items():
+        print(f"{name:<20} {rows:>8,} rows")
+    print(f"public datasets written to {out_dir}")
+    return 0
 
 
 def print_summary(result: IngestResult) -> None:
@@ -87,6 +107,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "report":
         return run_report(paths, args.output)
+    if args.command == "export-public":
+        return run_export(paths, args.output)
 
     if args.command == "ingest":
         if args.months < 1:
