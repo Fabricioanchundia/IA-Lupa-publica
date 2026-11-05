@@ -1,15 +1,16 @@
 # Lupa Pública 🔎
 
 **Ecuador's public procurement, easy to review.** Lupa Pública turns the open data that
-SERCOP publishes (342,282 procurement processes, about US$ 12.9 billion, Nov 2024 – Oct 2026)
-into a fast search site, entity profiles, a province map, statistically sound **risk
-signals** and an AI that answers questions in plain Spanish, without sending anyone's data
-to a server.
+SERCOP publishes into a fast search site, entity profiles, a province map, statistically
+sound **risk signals** and an AI that answers questions in plain Spanish, without sending
+anyone's data to a server. It covers the last 24 complete months (343,078 procurement
+processes and about US$ 13 billion as of November 2026) and refreshes itself every month.
 
 **🌎 Live site: [fabricioanchundia.github.io/Lupa-publica](https://fabricioanchundia.github.io/Lupa-publica/)**
 
 [![CI](https://github.com/Fabricioanchundia/Lupa-publica/actions/workflows/ci.yml/badge.svg)](https://github.com/Fabricioanchundia/Lupa-publica/actions/workflows/ci.yml)
 [![web](https://github.com/Fabricioanchundia/Lupa-publica/actions/workflows/web.yml/badge.svg)](https://github.com/Fabricioanchundia/Lupa-publica/actions/workflows/web.yml)
+[![monthly data refresh](https://github.com/Fabricioanchundia/Lupa-publica/actions/workflows/refresh.yml/badge.svg)](https://github.com/Fabricioanchundia/Lupa-publica/actions/workflows/refresh.yml)
 ![License: MIT](https://img.shields.io/badge/code-MIT-blue)
 ![Data: CC BY 3.0 EC](https://img.shields.io/badge/data-CC%20BY%203.0%20EC-green)
 
@@ -17,6 +18,8 @@ to a server.
 > compares an entity with others that buy similar things and has a public methodology.
 
 🇪🇨 [Resumen en español](#-en-español)
+
+![Lupa Pública home page: search box, key figures, entities to review first and processes per month](docs/img/home.png)
 
 ---
 
@@ -27,12 +30,16 @@ to a server.
 | 🔍 | **Search every contract** by description, entity or supplier, with filters (province, year, category, procedure, "only with signals") | DuckDB runs **inside the browser** (WebAssembly) on the public datasets: no backend, nothing you search leaves your device |
 | 🏛️ | **Entity profiles**: totals, the three signals explained in one sentence each, concentrated suppliers, largest contracts | Same in-browser queries, linked from every table |
 | 🗺️ | **Province map** for four metrics, with a ranked table | Natural Earth boundaries pre-converted to SVG, no map service |
-| 🚩 | **Review priority**: 12 entities to review first, 62 to review | Leave-one-out baselines, Poisson tail, Benjamini-Hochberg FDR |
+| 🚩 | **Review priority**: a short list of entities to review first (12 in November 2026) and others to review (62) | Leave-one-out baselines, Poisson tail, Benjamini-Hochberg FDR |
 | 🤖 | **Ask in Spanish**: "¿Qué hospitales tienen más contratos de una sola oferta?" | Text-to-SQL with a local open model, two safety locks, and the SQL shown with every answer |
 | 📚 | **Ask about procurement law**: answers that cite the exact article of the LOSNCP or its regulation | RAG: 562 articles embedded locally (bge-m3), every citation checked against the articles retrieved |
 | 🔌 | **Use it from an AI assistant** (Claude Desktop, IDE agents) | `lupa mcp`: an MCP server with read-only tools over the public data and the law |
 | 🔄 | **Fresh data every month**, with nobody pressing a button | A scheduled GitHub Actions robot re-downloads the last 24 months, rebuilds and tests everything, and stops itself if the new data looks broken |
 | ✋ | **Right of reply**: any entity can ask for a correction | GitHub issue template, public and logged |
+
+| Province map | Questions in Spanish, answered from the data |
+|---|---|
+| ![Map of Ecuador's provinces colored by number of procurement processes](docs/img/map.png) | ![AI gallery: a question in Spanish, the AI summary and the exact table it came from](docs/img/ask.png) |
 
 ## Risk signals
 
@@ -52,6 +59,7 @@ Details: [docs/indicators](docs/indicators/README.md).
 
 ```mermaid
 flowchart LR
+    R[GitHub Actions<br/>monthly robot] -.->|day 3 of each month| S
     S[SERCOP open data<br/>OCDS monthly files] -->|lupa backfill / ingest| B[(bronze<br/>raw JSON in DuckDB)]
     B -->|dbt| SV[(silver<br/>typed tables)]
     SV -->|dbt| G[(gold<br/>signals + priority)]
@@ -75,6 +83,17 @@ flowchart LR
   can re-run in the browser. Why: [ADR-0006](docs/adr/0006-text-to-sql-with-local-model.md).
 
 Every important decision has an [Architecture Decision Record](docs/adr/README.md).
+
+## Tech stack
+
+| Area | Tools |
+|---|---|
+| Data pipeline | Python 3.12, httpx (resumable downloads), DuckDB, dbt Core + dbt-duckdb, OCDS |
+| Statistics | Leave-one-out baselines, Poisson tail probabilities, Benjamini-Hochberg false discovery rate |
+| Website | React 19, TypeScript, Vite, DuckDB-WASM, SVG map, GitHub Pages |
+| AI | Ollama (`qwen2.5:7b`, `bge-m3`), Text-to-SQL with sqlglot guard, RAG with cited articles, MCP server, evaluation set |
+| Quality and security | pytest (175+ tests), mypy strict, ruff with security rules, dbt data tests, gitleaks, strict CSP, HMAC pseudonyms |
+| Operations | GitHub Actions (CI, monthly refresh with a safety check, Pages deploy), GitHub Releases for data |
 
 ## How good is the AI? (measured)
 
@@ -125,7 +144,7 @@ cp .env.example .env    # then set LUPA_PSEUDONYM_KEY:
 python -c "import secrets; print(secrets.token_hex(32))"
 set -a && source .env && set +a
 
-uv run lupa backfill --from 2024-11 --to 2026-10       # download SERCOP data (large)
+uv run lupa backfill --from 2024-11 --to 2026-10       # SERCOP data, 24 months (~15 min)
 uv run dbt build --project-dir dbt --profiles-dir dbt  # silver + gold + tests
 uv run lupa export-public                              # public datasets -> web/public/data
 
@@ -145,17 +164,20 @@ npx @modelcontextprotocol/inspector uv run lupa mcp
 ```
 
 Quality gates: `uv run ruff check . && uv run mypy src && uv run pytest` (strict typing,
-security lint rules, 160+ tests), `dbt build` on a synthetic fixture in CI, pre-commit with
+security lint rules, 175+ tests), `dbt build` on a synthetic fixture in CI, pre-commit with
 secret scanning.
 
 ## Project structure
 
 ```
-src/lupa_publica/   ingestion, export, privacy, Text-to-SQL (ask, sql_guard, semantic, llm), law RAG, MCP server
+src/lupa_publica/   ingestion, export, privacy, Text-to-SQL (ask, sql_guard, semantic, llm),
+                    law RAG, MCP server, AI evaluation, release check
 dbt/                staging → silver → gold models, macros, unit and data tests
 web/                React app (pages, in-browser DuckDB, map, AI gallery)
-docs/               ADRs, indicator methodologies, data model, coverage report
+evals/              question sets with checked answers, and every evaluation report
+docs/               ADRs, indicator methodologies, data model, coverage report, screenshots
 tests/              pytest suite (fake LLM, locked database, privacy guards)
+.github/workflows/  CI, website build, Pages deploy, monthly data refresh
 ```
 
 ## Roadmap
@@ -194,14 +216,15 @@ Built by **Fabricio Anchundia** (Manta, Ecuador).
 ## 🇪🇨 En español
 
 **Lupa Pública hace fácil revisar la contratación pública del Ecuador.** Toma los datos
-abiertos del SERCOP de los últimos 24 meses (unos 340 mil procesos y US$ 13 mil millones)
-y los convierte en una página web con:
+abiertos del SERCOP de los últimos 24 meses (343.078 procesos y unos US$ 13 mil millones a
+noviembre de 2026) y los convierte en una página web con:
 
 - **Buscador de contratos** con filtros (provincia, año, categoría, procedimiento).
 - **Ficha de cada institución**, con sus señales explicadas en palabras simples.
 - **Mapa por provincia.**
-- **Prioridad de revisión:** 12 entidades para revisar primero.
+- **Prioridad de revisión:** una lista corta de entidades para revisar primero.
 - **Preguntas en español con IA**, mostrando siempre la consulta usada.
+- **Preguntas sobre la ley** (LOSNCP y su reglamento), citando el artículo exacto.
 
 **Las señales no son acusaciones.** Comparan a cada institución con otras que compran
 cosas parecidas, solo cuentan cuando la diferencia es grande y difícilmente casual, y cada
