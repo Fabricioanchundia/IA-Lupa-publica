@@ -54,7 +54,8 @@ Rules:
 - Give readable column aliases in Spanish (e.g. AS monto_total).
 - Signals (single_bid, short_period, review_priority...) are risk signals, not proof of
   wrongdoing.
-- Never try to identify people behind 'Persona #...' labels.
+- Never try to identify people behind 'Persona #...' labels. Counting or adding them up
+  (how many, how much) is fine: only identifying one person must be declined.
 - If the data cannot answer the question, reply exactly: NO_SQL: <short reason in Spanish>
 Reply with the SQL only, inside a ```sql code block.
 """

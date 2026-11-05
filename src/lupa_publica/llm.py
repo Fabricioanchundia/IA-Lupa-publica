@@ -15,7 +15,10 @@ from typing import Literal, Protocol
 import httpx
 
 DEFAULT_URL = "http://localhost:11434"
-DEFAULT_MODEL = "qwen2.5-coder:7b"
+# One general model for SQL and law. On the exam (evals/, ADR-0009) it tied the coding
+# model on SQL (17/18 each, different misses) with no retries and no unverified numbers in
+# its explanations, and only it cited articles reliably.
+DEFAULT_MODEL = "qwen2.5:7b"
 
 
 @dataclass(frozen=True)

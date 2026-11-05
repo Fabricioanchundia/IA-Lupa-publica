@@ -220,3 +220,15 @@ def test_schema_points_signal_levels_to_review_priority(con: duckdb.DuckDBPyConn
     # A real mistake of the model: it looked for r018_level in r018_buyers.
     schema = describe_schema(con)
     assert "use review_priority.r018_level" in schema
+
+
+def test_rules_allow_counting_anonymous_persons() -> None:
+    # A real over-refusal: "¿cuántos proveedores son personas naturales?" was declined.
+    from lupa_publica.ask import SQL_RULES
+
+    assert "Counting or adding them up" in SQL_RULES
+
+
+def test_schema_explains_how_to_count_suppliers(con: duckdb.DuckDBPyConnection) -> None:
+    # A real mistake: COUNT(*) of processes instead of COUNT(DISTINCT supplier_label).
+    assert "COUNT(DISTINCT supplier_label)" in describe_schema(con)

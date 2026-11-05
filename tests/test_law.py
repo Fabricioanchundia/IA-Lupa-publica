@@ -262,3 +262,29 @@ def test_the_model_gets_whole_articles_not_just_the_matching_part(
     assert len(result.sources) == 1
     assert "cinco días" in result.sources[0].text
     assert "cinco días" in model.calls[0][-1].content
+
+
+def test_articles_reach_the_model_with_the_full_name_of_their_source(index: LawIndex) -> None:
+    # A real mistake: the model cited [LOSNCP Art. 123] for RGLOSNCP Art. 123.
+    model = FakeModel("Cinco días [LOSNCP Art. 45 bis].")
+    answer("plazo ofertas subasta", index, model)
+    prompt = model.calls[0][-1].content
+    assert (
+        "[LOSNCP Art. 45 bis] (Ley Orgánica del Sistema Nacional de Contratación Pública)" in prompt
+    )
+    assert "Never change an article's source" in model.calls[0][0].content
+
+
+@pytest.mark.parametrize(
+    "citation",
+    ["[RGLOSNCP Art. 258,1]", "[RGLOSNCP Art. 258, numeral 2]", "[RGLOSNCPArt. 258]"],
+)
+def test_citations_to_a_paragraph_of_the_article_are_accepted(citation: str) -> None:
+    # Real answers cited items of article 258 and once dropped the space.
+    sources = [Article("RGLOSNCP", "258", 1, "...")]
+    assert verify_citations(f"Regla común {citation}.", sources) == []
+
+
+def test_a_paragraph_of_another_article_is_still_wrong() -> None:
+    sources = [Article("RGLOSNCP", "258", 1, "...")]
+    assert verify_citations("Regla [RGLOSNCP Art. 25,8].", sources) == ["[RGLOSNCP Art. 25,8]"]

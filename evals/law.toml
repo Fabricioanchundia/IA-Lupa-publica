@@ -1,0 +1,66 @@
+# Evaluation set for `lupa law` (RAG over the LOSNCP and its regulation).
+# Run: uv run lupa eval law
+#
+# `articles`: the answer must be supported by at least one of these articles, written as
+# "SOURCE NUMBER" (e.g. "LOSNCP 50"). Measured twice: did the search retrieve one of them,
+# and does the answer cite one of them.
+# `expect_not_found = true`: a trap; the law does not answer it, so the right reply is
+# "No encontré la respuesta en los artículos consultados."
+
+[[case]]
+id = "infima-cuantia"
+question = "¿Qué es la ínfima cuantía y cuál es su monto máximo?"
+articles = ["LOSNCP 50"]
+
+[[case]]
+id = "infima-procedure"
+question = "¿Cuál es el procedimiento para realizar una contratación por ínfima cuantía?"
+articles = ["RGLOSNCP 269"]
+
+[[case]]
+id = "subasta-inversa"
+question = "¿En qué consiste la subasta inversa electrónica?"
+articles = ["LOSNCP 47", "RGLOSNCP 257"]
+
+[[case]]
+id = "subasta-reglas"
+question = "¿Qué reglas comunes debe cumplir toda subasta inversa?"
+articles = ["RGLOSNCP 258"]
+
+[[case]]
+id = "subasta-corporativa"
+question = "¿Qué es la subasta inversa corporativa?"
+articles = ["RGLOSNCP 123"]
+
+[[case]]
+id = "objeto-ley"
+question = "¿Cuál es el objeto de la Ley Orgánica del Sistema Nacional de Contratación Pública?"
+articles = ["LOSNCP 1"]
+
+[[case]]
+id = "obligaciones-proveedores"
+question = "¿Qué obligaciones tienen los proveedores del Estado?"
+# First run: the model answered from RGLOSNCP 201 (obligations of catalogue suppliers) and
+# RGLOSNCP 53 (conduct of suppliers), both correct and cited. The key only listed
+# LOSNCP 45, so it was too strict; the other valid sources were added after reading them.
+articles = ["LOSNCP 45", "RGLOSNCP 201", "RGLOSNCP 53"]
+
+[[case]]
+id = "retencion-pagos"
+question = "¿Qué pasa si una entidad retiene indebidamente los pagos a un contratista?"
+articles = ["LOSNCP 114"]
+
+[[case]]
+id = "trap-robbery"
+question = "¿Cuántos años de cárcel tiene el robo a un banco?"
+expect_not_found = true
+
+[[case]]
+id = "trap-salary"
+question = "¿Cuál es el salario básico unificado en Ecuador este año?"
+expect_not_found = true
+
+[[case]]
+id = "trap-geography"
+question = "¿Cuál es la capital de Francia?"
+expect_not_found = true

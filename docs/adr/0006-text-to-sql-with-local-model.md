@@ -49,3 +49,10 @@ never publish personal data or invent numbers.
 - The website keeps its "Preguntar con IA" page as a preview until we decide how to
   serve a model publicly (cost, abuse limits).
 - New dependency: sqlglot (pure Python SQL parser).
+
+## Update (2026-11-04)
+
+After the evaluation of ADR-0009 the default model is `qwen2.5:7b`, a general model,
+for both SQL and law questions: on the SQL exam it tied `qwen2.5-coder:7b` (17/18 each,
+different misses) with no retries and no unverified numbers in its explanations, and it
+was the only one that cited law articles reliably. One model also means one download.

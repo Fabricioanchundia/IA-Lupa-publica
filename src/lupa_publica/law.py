@@ -28,8 +28,8 @@ import httpx
 from lupa_publica.llm import DEFAULT_URL, LanguageModel, Message
 
 DEFAULT_EMBED_MODEL = "bge-m3"
-# A general model cites better than the coding model used for SQL (compared on the same
-# questions: qwen2.5-coder answered without citations, qwen2.5 cited the article).
+# A general model cites better than a coding model (compared on the same questions:
+# qwen2.5-coder answered without citations, qwen2.5 cited the article).
 DEFAULT_LAW_MODEL = "qwen2.5:7b"
 MAX_CHARS = 1500  # long articles are split into parts of about this size
 TOP_K = 8
@@ -51,7 +51,22 @@ MENTION = re.compile(
     flags=re.IGNORECASE,
 )
 PAGE_NUMBER = re.compile(r"^\s*(?:P[áa]g(?:ina)?\.?\s*)?\d+\s*(?:de\s*\d+)?\s*$", re.IGNORECASE)
-CITATION = re.compile(r"\[(?P<source>[A-ZÁÉÍÓÚ]+)\s+Art\.?\s*(?P<num>[^\]]+?)\]", re.IGNORECASE)
+CITATION = re.compile(r"\[(?P<source>[A-ZÁÉÍÓÚ]+)\s*Art\.?\s*(?P<num>[^\]]+?)\]", re.IGNORECASE)
+# The article inside a citation. Anything after it is a paragraph or item of the same
+# article ("[RGLOSNCP Art. 258, 1]", "[LOSNCP Art. 6 numeral 3]") and is accepted.
+ARTICLE_NUMBER = re.compile(
+    r"\d+(?:\.\d+)*(?:\s*(?:bis|ter|quater|quinquies))?|innumerado(?:-\d+)?", re.IGNORECASE
+)
+
+
+def cited_articles(text: str) -> list[tuple[str, str]]:
+    """(source, article) of every [SOURCE Art. N] citation in ``text``."""
+    found: list[tuple[str, str]] = []
+    for match in CITATION.finditer(text):
+        number = ARTICLE_NUMBER.match(match.group("num").strip())
+        value = number.group(0) if number else match.group("num")
+        found.append((match.group("source").upper(), " ".join(value.split()).lower()))
+    return found
 
 
 @dataclass(frozen=True)
@@ -300,11 +315,17 @@ who are not lawyers.
   as in the list, e.g. "El plazo es de cinco días [LOSNCP Art. 6]." A sentence you cannot
   cite must not be written.
 - Copy numbers (amounts, days, percentages) exactly as the article says them.
+- Copy each citation exactly as given, source included: LOSNCP is the Law and RGLOSNCP is
+  its Regulation, and the same number can exist in both. Never change an article's source.
 - If the articles do not answer the question, reply exactly:
   "No encontré la respuesta en los artículos consultados."
 - 2 to 6 sentences.
 """
 MAX_CONTEXT_CHARS = 16000
+SOURCE_NAMES = {
+    "LOSNCP": "Ley Orgánica del Sistema Nacional de Contratación Pública",
+    "RGLOSNCP": "Reglamento General a la LOSNCP",
+}
 
 
 @dataclass
@@ -329,8 +350,7 @@ def verify_citations(text: str, sources: Sequence[Article]) -> list[str]:
     given = {(a.source.upper(), a.number.lower()) for a in sources}
     numbers = {a.number.lower() for a in sources}
     wrong: list[str] = []
-    for match in CITATION.finditer(text):
-        key = (match.group("source").upper(), " ".join(match.group("num").split()).lower())
+    for match, key in zip(CITATION.finditer(text), cited_articles(text), strict=True):
         if key not in given:
             wrong.append(match.group(0))
     for match in MENTION.finditer(CITATION.sub("", text)):
@@ -349,7 +369,9 @@ def answer(question: str, index: LawIndex, model: LanguageModel) -> LawAnswer:
     # A hit is often one part of a long article; give the model the whole article, so a
     # rule split across parts (a deadline in the second paragraph) is not lost.
     articles = index.whole_articles([article for article, _ in hits], MAX_CONTEXT_CHARS)
-    context = "\n\n".join(f"{a.citation}\n{a.text}" for a in articles)
+    context = "\n\n".join(
+        f"{a.citation} ({SOURCE_NAMES.get(a.source, a.source)})\n{a.text}" for a in articles
+    )
     reply = model.complete(
         [
             Message("system", ANSWER_RULES),
