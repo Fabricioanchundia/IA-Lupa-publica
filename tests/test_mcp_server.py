@@ -2,6 +2,7 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
+import duckdb
 import pytest
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -77,3 +78,23 @@ def test_entity_profile_explains_signals_neutrally(server: MCPServer) -> None:
     assert "not evidence of wrongdoing" in text
     assert "Persona #46249a" in text
     assert call(server, "entity_profile", name="no existe") == "No entity matches 'no existe'."
+
+
+def test_entity_profile_lists_candidates_instead_of_guessing(tmp_path: Path) -> None:
+    db = tmp_path / "lupa.duckdb"
+    make_gold(db)
+    with duckdb.connect(str(db)) as con:
+        con.execute(
+            "insert into silver.processes select * replace ('ocds-9' as ocid, "
+            "'EC-RUC-1760009990001' as buyer_id, 'GAD Y' as buyer_name) "
+            "from silver.processes limit 1"
+        )
+    export_public(db, tmp_path / "public")
+    server = build_server(open_public_data(tmp_path / "public"))
+
+    text = call(server, "entity_profile", name="gad")
+    assert "2 entities match 'gad'" in text
+    assert "EC-RUC-1760009990001" in text
+
+    profile = call(server, "entity_profile", name="EC-RUC-1760009990001")
+    assert profile.startswith("# GAD Y")

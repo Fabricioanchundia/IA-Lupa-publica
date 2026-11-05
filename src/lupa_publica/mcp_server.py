@@ -121,21 +121,30 @@ def build_server(con: duckdb.DuckDBPyConnection) -> MCPServer:
     def entity_profile(name: str) -> str:
         """Profile of one public entity: totals and risk signals explained in plain Spanish.
 
-        name: part of the entity name (e.g. 'MANTA', 'HOSPITAL VICENTE CORRAL').
+        name: the entity's buyer_id, or (part of) its name, e.g. 'HOSPITAL VICENTE CORRAL'.
+        If several entities match, returns the candidates instead: call again with the
+        buyer_id of the right one.
         """
         _, matches = select(
-            "SELECT b.buyer_id, b.buyer_name, b.buyer_region, count(p.ocid) AS n "
+            "SELECT b.buyer_id, b.buyer_name, b.buyer_region, count(p.ocid) AS processes "
             "FROM buyers AS b LEFT JOIN processes AS p ON p.buyer_id = b.buyer_id "
-            "WHERE b.buyer_name ILIKE ? GROUP BY ALL ORDER BY n DESC LIMIT 10",
-            [f"%{name}%"],
+            "WHERE b.buyer_id = ? OR b.buyer_name ILIKE ? "
+            "GROUP BY b.buyer_id, b.buyer_name, b.buyer_region "
+            "ORDER BY (b.buyer_id = ?) DESC, processes DESC LIMIT 15",
+            [name, f"%{name}%", name],
         )
         if not matches:
             return f"No entity matches '{name}'."
-        buyer_id, buyer_name, region, _ = matches[0]
-        lines = [f"# {buyer_name} ({region or 'sin provincia'})"]
-        if len(matches) > 1:
-            others = "; ".join(str(m[1]) for m in matches[1:])
-            lines.append(f"Other entities matching '{name}': {others}")
+        exact = [m for m in matches if name == m[0] or name.upper() == str(m[1]).upper()]
+        if len(matches) > 1 and not exact:
+            # Never guess: 'MANTA' matches the municipality, a hospital, the fire department...
+            return (
+                f"{len(matches)} entities match '{name}'. Call entity_profile again with the "
+                "buyer_id of the one you mean:\n"
+                + markdown_table(["buyer_id", "entidad", "provincia", "procesos"], matches)
+            )
+        buyer_id, buyer_name, region, _ = (exact or matches)[0]
+        lines = [f"# {buyer_name} ({region or 'sin provincia'})", f"buyer_id: {buyer_id}"]
         _, totals = select(
             "SELECT count(*), sum(amount), min(month), max(month) FROM processes "
             "WHERE buyer_id = ?",
