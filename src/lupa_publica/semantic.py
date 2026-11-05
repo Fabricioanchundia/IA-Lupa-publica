@@ -36,7 +36,9 @@ TABLES: dict[str, TableDoc] = {
             "cpc_division": "two-digit product category code; join cpc_divisions",
             "supplier_label": (
                 "main supplier: company name in capitals, or 'Persona #xxxxxx' for an "
-                "anonymous natural person (never try to identify them)"
+                "anonymous natural person (never try to identify them). One supplier "
+                "appears in many rows (one per process it won): to count suppliers use "
+                "COUNT(DISTINCT supplier_label)"
             ),
         },
     ),

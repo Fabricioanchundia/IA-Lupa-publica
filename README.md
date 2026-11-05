@@ -67,10 +67,32 @@ flowchart LR
 - **Static site**: React 19 + Vite + TypeScript, DuckDB-WASM, strict Content Security
   Policy (own files only). Data files travel as a GitHub Release, not in git.
 - **AI without a server**: questions are answered by an open model running locally
-  (Ollama, `qwen2.5-coder:7b`). The website shows a reviewed gallery whose SQL each visitor
+  (Ollama, `qwen2.5:7b`). The website shows a reviewed gallery whose SQL each visitor
   can re-run in the browser. Why: [ADR-0006](docs/adr/0006-text-to-sql-with-local-model.md).
 
 Every important decision has an [Architecture Decision Record](docs/adr/README.md).
+
+## How good is the AI? (measured)
+
+The AI takes a fixed exam with answers checked by a person ([`evals/`](evals),
+[ADR-0009](docs/adr/0009-ai-evaluation.md)). Text-to-SQL is graded by **execution
+accuracy**: the model's SQL and a reference SQL run on the same data and must return the
+same values. Every run is saved in [`evals/results/`](evals/results).
+
+| Exam | Model | Result |
+|---|---|---|
+| Questions about the data (18) | `qwen2.5:7b` | **17/18 correct (94%)**, 0 retries, 0 unverified numbers |
+| Questions about the data (18) | `qwen2.5-coder:7b` | 17/18 correct (94%), a different miss |
+| Must decline (4): ID numbers, deleting data, unknown owners, predictions | both | **4/4 declined** |
+| Questions about the law (8) | `qwen2.5:7b` | **8/8 cite the right article** (first run: 6/8), 0 invented citations |
+| Traps the law does not cover (3) | `qwen2.5:7b` | **3/3 "not found"** |
+
+What the exam caught, and how each was fixed: declining to *count* anonymous persons
+(rule clarified), citing the Law for an article of the Regulation (sources named in the
+context), citations to an item of an article rejected by the checker (checker fixed),
+counting processes instead of distinct suppliers (described in the semantic layer; the
+coding model still misses it, the general model does not). With 33 questions the exam
+catches regressions and compares models; it is not a precise accuracy estimate.
 
 ## Privacy and AI safety
 
@@ -106,11 +128,11 @@ uv run lupa export-public                              # public datasets -> web/
 cd web && npm ci && npm run dev                        # http://localhost:5173
 
 # AI (optional, free, local)
-ollama pull qwen2.5-coder:7b
+ollama pull qwen2.5:7b
 uv run lupa ask "¿Cuánto se gastó en Manabí en 2025?"
 
 # Questions about procurement law (put LOSNCP.pdf and RGLOSNCP.pdf in data/law/)
-ollama pull bge-m3 && ollama pull qwen2.5:7b
+ollama pull bge-m3
 uv run lupa law-index
 uv run lupa law "¿Qué es la ínfima cuantía?"
 
@@ -119,7 +141,7 @@ npx @modelcontextprotocol/inspector uv run lupa mcp
 ```
 
 Quality gates: `uv run ruff check . && uv run mypy src && uv run pytest` (strict typing,
-security lint rules, 120+ tests), `dbt build` on a synthetic fixture in CI, pre-commit with
+security lint rules, 160+ tests), `dbt build` on a synthetic fixture in CI, pre-commit with
 secret scanning.
 
 ## Project structure
@@ -142,10 +164,10 @@ Done:
 - ✅ Questions in Spanish (Text-to-SQL with a local model) and a reviewed AI gallery
 - ✅ MCP server so AI assistants can query the public data safely
 - ✅ Answers about procurement law citing the exact article (RAG over the LOSNCP and its regulation)
+- ✅ A public evaluation of the AI: accuracy, refusals, citations and invented numbers
 
 Next:
 
-- 📏 A public evaluation of the AI: accuracy, refusals and invented numbers
 - 🔄 Automatic monthly data refresh
 - 🔎 Search by item descriptions, and merging entities that SERCOP publishes under several IDs
 
@@ -189,8 +211,12 @@ servidor, ni cookies, ni seguimiento.
 solo pueda leer datos públicos, y los números salen de los datos. Corre en una computadora
 propia con un modelo abierto, sin costo.
 
-**Próximamente:** una evaluación pública de la IA y la actualización automática cada mes.
-Ya puede responder preguntas sobre la Ley de Contratación Pública citando el artículo exacto.
+**¿Qué tan buena es la IA?** Se le toma un examen con respuestas revisadas por una
+persona: acierta **17 de 18** preguntas sobre los datos, rechaza **4 de 4** pedidos que no
+debe responder (cédulas, borrar datos, predicciones), y en la ley cita el artículo correcto
+en **8 de 8** preguntas sin inventar ninguna cita.
+
+**Próximamente:** la actualización automática de los datos cada mes.
 
 **¿Algo está mal?** Cualquier institución puede
 [pedir una corrección](https://github.com/Fabricioanchundia/Lupa-publica/issues/new?template=correccion.yml).

@@ -65,9 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("web/public/data"),
         help="folder written by export-public (default: web/public/data)",
     )
-    ask_cmd.add_argument(
-        "--model", help="Ollama model (default: $LUPA_LLM_MODEL or qwen2.5-coder:7b)"
-    )
+    ask_cmd.add_argument("--model", help="Ollama model (default: $LUPA_LLM_MODEL or qwen2.5:7b)")
     ask_cmd.add_argument("--no-explain", action="store_true", help="only the SQL and the table")
 
     gallery_cmd = commands.add_parser(
@@ -86,7 +84,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="default: web/src/askExamples.json",
     )
     gallery_cmd.add_argument("--public-data", type=Path, default=Path("web/public/data"))
-    gallery_cmd.add_argument("--model", help="Ollama model (default: qwen2.5-coder:7b)")
+    gallery_cmd.add_argument("--model", help="Ollama model (default: qwen2.5:7b)")
 
     mcp_cmd = commands.add_parser(
         "mcp", help="MCP server over stdio so AI assistants can query the public data"
@@ -112,6 +110,16 @@ def build_parser() -> argparse.ArgumentParser:
     law_cmd.add_argument("question")
     law_cmd.add_argument("--index", type=Path, default=Path("data/law/law.duckdb"))
     law_cmd.add_argument("--model", help="Ollama model (default: $LUPA_LAW_MODEL or qwen2.5:7b)")
+
+    eval_cmd = commands.add_parser("eval", help="grade the AI on a fixed question set")
+    eval_cmd.add_argument("kind", choices=["ask", "law"], help="what to evaluate")
+    eval_cmd.add_argument("--cases", type=Path, help="default: evals/<kind>.toml")
+    eval_cmd.add_argument("--model", help="Ollama model to grade")
+    eval_cmd.add_argument("--limit", type=int, help="only the first N cases (quick check)")
+    eval_cmd.add_argument("--out", type=Path, default=Path("evals/results"))
+    eval_cmd.add_argument("--public-data", type=Path, default=Path("web/public/data"))
+    eval_cmd.add_argument("--index", type=Path, default=Path("data/law/law.duckdb"))
+    eval_cmd.add_argument("--no-explain", action="store_true", help="ask: skip explanations")
     return parser
 
 
@@ -311,6 +319,52 @@ def run_law(question: str, index: Path, model_name: str | None) -> int:
     return 0
 
 
+def run_eval(args: argparse.Namespace) -> int:
+    from lupa_publica import evaluate, law
+
+    cases = evaluate.load_cases(args.cases or Path("evals") / f"{args.kind}.toml")
+    if args.limit:
+        cases = cases[: args.limit]
+
+    def progress(n: int, total: int, question: str) -> None:
+        print(f"[{n}/{total}] {question}", flush=True)
+
+    try:
+        if args.kind == "ask":
+            model = OllamaModel(model=args.model)
+            con = open_public_data(args.public_data)
+            try:
+                results = evaluate.run_ask_eval(
+                    cases, model, con, explain=not args.no_explain, progress=progress
+                )
+            finally:
+                con.close()
+            summary = evaluate.ask_summary(cases, results)
+        else:
+            model = OllamaModel(
+                model=args.model or os.environ.get("LUPA_LAW_MODEL", law.DEFAULT_LAW_MODEL)
+            )
+            index = law.LawIndex.open(args.index, law.OllamaEmbedder())
+            results = evaluate.run_law_eval(cases, index, model, progress=progress)
+            summary = evaluate.law_summary(cases, results)
+    except FileNotFoundError as exc:
+        print(exc)
+        return 1
+    except (LLMError, RuntimeError, httpx.HTTPError) as exc:
+        print(f"AI not available: {exc}")
+        return 1
+
+    print()
+    for r in results:
+        print(f"{'✅' if r.passed else '❌'} {r.id:<28} {r.reason[:90]}")
+    print()
+    for key, value in summary.items():
+        print(f"{key:<38} {value}")
+    json_path, md_path = evaluate.write_report(args.kind, model.model, summary, results, args.out)
+    print(f"\nreport: {md_path} (all details in {json_path.name})")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -339,6 +393,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_law_index(args.pdf, args.index, args.check)
     if args.command == "law":
         return run_law(args.question, args.index, args.model)
+    if args.command == "eval":
+        return run_eval(args)
 
     if args.command == "ingest":
         if args.months < 1:
