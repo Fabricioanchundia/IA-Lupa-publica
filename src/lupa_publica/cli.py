@@ -84,6 +84,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     gallery_cmd.add_argument("--public-data", type=Path, default=Path("web/public/data"))
     gallery_cmd.add_argument("--model", help="Ollama model (default: qwen2.5-coder:7b)")
+
+    mcp_cmd = commands.add_parser(
+        "mcp", help="MCP server over stdio so AI assistants can query the public data"
+    )
+    mcp_cmd.add_argument("--public-data", type=Path, default=Path("web/public/data"))
     return parser
 
 
@@ -224,6 +229,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_ask(args.question, args.public_data, args.model, not args.no_explain)
     if args.command == "ask-examples":
         return run_gallery(args.questions, args.output, args.public_data, args.model)
+    if args.command == "mcp":
+        # Imported here: only this command needs the MCP library.
+        from lupa_publica.mcp_server import serve
+
+        serve(args.public_data)
+        return 0
 
     if args.command == "ingest":
         if args.months < 1:
