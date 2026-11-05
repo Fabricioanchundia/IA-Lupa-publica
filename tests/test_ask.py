@@ -7,7 +7,16 @@ import pytest
 from test_export import make_gold
 
 from lupa_publica import cli
-from lupa_publica.ask import EXAMPLES, NO_SQL, PUBLIC_TABLES, ask, open_public_data, run_query
+from lupa_publica.ask import (
+    EXAMPLES,
+    NO_SQL,
+    PUBLIC_TABLES,
+    ask,
+    open_public_data,
+    parse_number,
+    run_query,
+    unverified_numbers,
+)
 from lupa_publica.export import export_public
 from lupa_publica.llm import LLMError, Message, OllamaModel
 from lupa_publica.semantic import describe_schema, undocumented_columns
@@ -160,3 +169,33 @@ def test_the_examples_shown_to_the_model_really_work(
 ) -> None:
     columns, _ = run_query(con, check_sql(example, PUBLIC_TABLES))
     assert columns
+
+
+@pytest.mark.parametrize(
+    ("token", "value"),
+    [
+        ("12", 12.0),
+        ("1.234.567", 1234567.0),
+        ("1,234,567", 1234567.0),
+        ("1.234.567,89", 1234567.89),
+        ("12,5", 12.5),
+        ("3.5", 3.5),
+    ],
+)
+def test_reads_spanish_and_english_numbers(token: str, value: float) -> None:
+    assert parse_number(token) == value
+
+
+def test_flags_numbers_that_are_not_in_the_result() -> None:
+    rows = [("GAD X", 2, 1234567.4, 0.45)]
+    text = "GAD X tiene 2 señales, US$ 1.234.567 y 45 % con una oferta; en total 99 casos."
+    assert unverified_numbers(text, rows) == ["99"]
+
+
+def test_explanation_with_an_invented_number_is_marked(con: duckdb.DuckDBPyConnection) -> None:
+    model = FakeModel("select count(*) as procesos from processes", "Hay 7 procesos.")
+
+    answer = ask("¿Cuántos procesos hay en 2025?", model, con)
+
+    assert answer.rows == [(2,)]
+    assert answer.unverified_numbers == ["7"]

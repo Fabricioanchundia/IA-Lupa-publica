@@ -128,6 +128,13 @@ def print_answer(answer: Answer, max_rows: int = 20) -> None:
         print(f"... {len(answer.rows) - max_rows} filas más")
     if answer.explanation:
         print(f"\n{answer.explanation}")
+        print("\n(Explicación escrita por IA: la tabla de arriba es el dato exacto.)")
+    if answer.unverified_numbers:
+        print(
+            "⚠️  La explicación menciona números que no están en la tabla: "
+            + ", ".join(answer.unverified_numbers)
+            + ". Confía en la tabla."
+        )
 
 
 def run_ask(question: str, data_dir: Path, model_name: str | None, explain: bool) -> int:

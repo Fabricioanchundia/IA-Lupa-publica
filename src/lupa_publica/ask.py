@@ -86,9 +86,13 @@ EXAMPLES: tuple[tuple[str, str], ...] = (
 
 EXPLAIN_RULES = """\
 You explain the result of a database query to people who are not engineers, in simple
-Spanish, in 2 to 4 sentences. Use ONLY the numbers in the result; never add others.
-Write amounts like 'US$ 1.234.567'. If the result is empty, say that no data matched.
-Signals are reasons to look closer, never accusations: use neutral words.
+Spanish, in 2 to 4 sentences.
+- Use ONLY numbers that appear in the result; never add or estimate others.
+- Do not count rows yourself: when you say how many there are, use the row count given.
+- Copy names exactly as written (you may change CAPITALS to normal case); do not
+  translate or expand abbreviations.
+- Write amounts like 'US$ 1.234.567'. If the result is empty, say that no data matched.
+- Signals are reasons to look closer, never accusations: use neutral words.
 """
 
 
@@ -99,6 +103,7 @@ class Answer:
     columns: list[str] = field(default_factory=list)
     rows: list[tuple[object, ...]] = field(default_factory=list)
     explanation: str = ""
+    unverified_numbers: list[str] = field(default_factory=list)
     refusal: str | None = None
     error: str | None = None
     attempts: int = 0
@@ -207,8 +212,58 @@ def ask(
                 Message(
                     "user",
                     f"Question: {question}\nSQL: {answer.sql}\n"
-                    f"Result ({len(answer.rows)} rows, CSV):\n{result}",
+                    f"Row count: {len(answer.rows)}\nResult (CSV):\n{result}",
                 ),
             ]
         ).strip()
+        answer.unverified_numbers = unverified_numbers(
+            answer.explanation, answer.rows, extra=f"{question} {answer.sql} {len(answer.rows)}"
+        )
     return answer
+
+
+NUMBER = re.compile(r"\d[\d.,]*\d|\d")
+
+
+def parse_number(token: str) -> float | None:
+    """'1.234.567,8' (Spanish) or '1,234,567.8' (English) or '45' -> float."""
+    dots, commas = token.count("."), token.count(",")
+    if dots and commas:
+        decimal = "." if token.rfind(".") > token.rfind(",") else ","
+    elif dots or commas:
+        sep = "." if dots else ","
+        groups = token.split(sep)
+        thousands = len(groups) > 2 or len(groups[-1]) == 3
+        decimal = "" if thousands else sep
+    else:
+        decimal = ""
+    digits = "".join(c if c.isdigit() else ("." if c == decimal else "") for c in token)
+    try:
+        return float(digits)
+    except ValueError:
+        return None
+
+
+def unverified_numbers(text: str, rows: Sequence[tuple[object, ...]], extra: str = "") -> list[str]:
+    """Numbers in ``text`` that match no value of the result (nor the question or SQL).
+
+    A cheap safety net for the explanation: the table is always right because it comes
+    from the data, but the model writing the sentence can still slip. Percentages of a
+    0-1 share and rounded amounts count as matches.
+    """
+    known: list[float] = []
+    for row in rows:
+        for value in row:
+            if isinstance(value, int | float) and not isinstance(value, bool):
+                known += [float(value), float(value) * 100]
+            elif isinstance(value, str):
+                known += [n for t in NUMBER.findall(value) if (n := parse_number(t)) is not None]
+    known += [n for t in NUMBER.findall(extra) if (n := parse_number(t)) is not None]
+    problems: list[str] = []
+    for token in NUMBER.findall(text):
+        value = parse_number(token)
+        if value is None:
+            continue
+        if not any(abs(value - k) <= max(0.5, 0.005 * abs(k)) for k in known):
+            problems.append(token)
+    return problems

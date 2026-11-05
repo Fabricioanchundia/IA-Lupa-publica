@@ -38,7 +38,9 @@ never publish personal data or invent numbers.
    separate decision.
 7. **Neutral explanations.** A second call explains the result in simple Spanish using
    only the returned numbers, with the same rule as the website: signals are reasons to
-   look closer, not accusations.
+   look closer, not accusations. The explanation is labeled as AI-written and a check
+   marks any number in it that does not appear in the result (it cannot catch every
+   slip, e.g. a wrong count that happens to equal another value; Phase 9 measures it).
 
 ## Consequences
 
