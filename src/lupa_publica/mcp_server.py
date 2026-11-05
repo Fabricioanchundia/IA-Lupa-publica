@@ -21,6 +21,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
 from lupa_publica.ask import PUBLIC_TABLES, open_public_data, run_query, show
+from lupa_publica.law import LawIndex, OllamaEmbedder
 from lupa_publica.semantic import describe_schema
 from lupa_publica.sql_guard import UnsafeQueryError, check_sql
 
@@ -53,8 +54,11 @@ def markdown_table(columns: Sequence[str], rows: Sequence[tuple[object, ...]]) -
     return "\n".join(lines)
 
 
-def build_server(con: duckdb.DuckDBPyConnection) -> MCPServer:
-    """An MCP server whose tools read ``con`` (a locked database with the public data)."""
+def build_server(con: duckdb.DuckDBPyConnection, law: LawIndex | None = None) -> MCPServer:
+    """An MCP server whose tools read ``con`` (a locked database with the public data).
+
+    With a law index, a fifth tool searches the procurement law (RAG, ADR-0008).
+    """
     server = MCPServer(name="lupa-publica", instructions=INSTRUCTIONS)
     lock = threading.Lock()  # one DuckDB connection, one query at a time
 
@@ -121,21 +125,30 @@ def build_server(con: duckdb.DuckDBPyConnection) -> MCPServer:
     def entity_profile(name: str) -> str:
         """Profile of one public entity: totals and risk signals explained in plain Spanish.
 
-        name: part of the entity name (e.g. 'MANTA', 'HOSPITAL VICENTE CORRAL').
+        name: the entity's buyer_id, or (part of) its name, e.g. 'HOSPITAL VICENTE CORRAL'.
+        If several entities match, returns the candidates instead: call again with the
+        buyer_id of the right one.
         """
         _, matches = select(
-            "SELECT b.buyer_id, b.buyer_name, b.buyer_region, count(p.ocid) AS n "
+            "SELECT b.buyer_id, b.buyer_name, b.buyer_region, count(p.ocid) AS processes "
             "FROM buyers AS b LEFT JOIN processes AS p ON p.buyer_id = b.buyer_id "
-            "WHERE b.buyer_name ILIKE ? GROUP BY ALL ORDER BY n DESC LIMIT 10",
-            [f"%{name}%"],
+            "WHERE b.buyer_id = ? OR b.buyer_name ILIKE ? "
+            "GROUP BY b.buyer_id, b.buyer_name, b.buyer_region "
+            "ORDER BY (b.buyer_id = ?) DESC, processes DESC LIMIT 15",
+            [name, f"%{name}%", name],
         )
         if not matches:
             return f"No entity matches '{name}'."
-        buyer_id, buyer_name, region, _ = matches[0]
-        lines = [f"# {buyer_name} ({region or 'sin provincia'})"]
-        if len(matches) > 1:
-            others = "; ".join(str(m[1]) for m in matches[1:])
-            lines.append(f"Other entities matching '{name}': {others}")
+        exact = [m for m in matches if name == m[0] or name.upper() == str(m[1]).upper()]
+        if len(matches) > 1 and not exact:
+            # Never guess: 'MANTA' matches the municipality, a hospital, the fire department...
+            return (
+                f"{len(matches)} entities match '{name}'. Call entity_profile again with the "
+                "buyer_id of the one you mean:\n"
+                + markdown_table(["buyer_id", "entidad", "provincia", "procesos"], matches)
+            )
+        buyer_id, buyer_name, region, _ = (exact or matches)[0]
+        lines = [f"# {buyer_name} ({region or 'sin provincia'})", f"buyer_id: {buyer_id}"]
         _, totals = select(
             "SELECT count(*), sum(amount), min(month), max(month) FROM processes "
             "WHERE buyer_id = ?",
@@ -158,6 +171,22 @@ def build_server(con: duckdb.DuckDBPyConnection) -> MCPServer:
         lines += ["", "Largest processes:", markdown_table(columns, top)]
         lines.append("\nSignals are reasons to look closer, not evidence of wrongdoing.")
         return "\n".join(lines)
+
+    if law is not None:
+        law_index = law
+
+        @server.tool(annotations=READ_ONLY)
+        def search_law(question: str, k: int = 6) -> str:
+            """Articles of Ecuador's procurement law (LOSNCP) and its General Regulation
+            (RGLOSNCP) closest in meaning to the question, with their citation.
+
+            Answer only from these texts and cite them, e.g. [LOSNCP Art. 6]. Not legal advice.
+            """
+            with lock:
+                hits = law_index.search(question, k=max(1, min(k, 12)))
+            return "\n\n".join(
+                f"{a.citation} (similarity {score:.2f})\n{a.text}" for a, score in hits
+            )
 
     return server
 
@@ -182,6 +211,9 @@ def signal_sentences(row: dict[str, object]) -> list[str]:
     return out
 
 
-def serve(data_dir: Path) -> None:
+def serve(data_dir: Path, law_db: Path | None = None) -> None:
     """Run the server over stdio (what Claude Desktop and MCP Inspector use)."""
-    build_server(open_public_data(data_dir)).run()
+    law = None
+    if law_db is not None and law_db.exists():
+        law = LawIndex.open(law_db, OllamaEmbedder())
+    build_server(open_public_data(data_dir), law).run()

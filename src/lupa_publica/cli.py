@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
+
+import httpx
 
 from lupa_publica.ask import Answer, ask, open_public_data, show
 from lupa_publica.ask_gallery import build_gallery, read_questions, write_gallery
@@ -89,6 +92,26 @@ def build_parser() -> argparse.ArgumentParser:
         "mcp", help="MCP server over stdio so AI assistants can query the public data"
     )
     mcp_cmd.add_argument("--public-data", type=Path, default=Path("web/public/data"))
+    mcp_cmd.add_argument("--law-index", type=Path, default=Path("data/law/law.duckdb"))
+
+    law_index_cmd = commands.add_parser(
+        "law-index", help="split the law PDFs into articles and embed them (RAG index)"
+    )
+    law_index_cmd.add_argument(
+        "--pdf",
+        action="append",
+        metavar="NAME=PATH",
+        help="default: LOSNCP=data/law/LOSNCP.pdf and RGLOSNCP=data/law/RGLOSNCP.pdf",
+    )
+    law_index_cmd.add_argument("--index", type=Path, default=Path("data/law/law.duckdb"))
+    law_index_cmd.add_argument(
+        "--check", action="store_true", help="only show how the PDFs split, do not embed"
+    )
+
+    law_cmd = commands.add_parser("law", help="ask about procurement law, with cited articles")
+    law_cmd.add_argument("question")
+    law_cmd.add_argument("--index", type=Path, default=Path("data/law/law.duckdb"))
+    law_cmd.add_argument("--model", help="Ollama model (default: $LUPA_LAW_MODEL or qwen2.5:7b)")
     return parser
 
 
@@ -211,6 +234,83 @@ def run_gallery(questions_file: Path, output: Path, data_dir: Path, model_name: 
     return 0
 
 
+def law_sources(pairs: list[str] | None) -> dict[str, Path]:
+    if not pairs:
+        return {name: Path("data/law") / f"{name}.pdf" for name in ("LOSNCP", "RGLOSNCP")}
+    sources: dict[str, Path] = {}
+    for pair in pairs:
+        name, _, path = pair.partition("=")
+        sources[name.strip().upper()] = Path(path)
+    return sources
+
+
+def run_law_index(pairs: list[str] | None, index: Path, check: bool) -> int:
+    from lupa_publica import law
+
+    sources = law_sources(pairs)
+    missing = [str(p) for p in sources.values() if not p.exists()]
+    if missing:
+        print(f"PDF not found: {', '.join(missing)}")
+        return 1
+    if check:
+        for name, path in sources.items():
+            articles, mode = law.extract_articles(path, name)
+            report = law.numbering_report(articles)
+            text = law.clean_pages(law.pdf_pages(path, mode))
+            print(f"\n{name}: {len(text):,} characters of text (read in '{mode}' mode)")
+            print(f"  {report['articles']} articles in {report['chunks']} chunks")
+            print(f"  first: {report['first']}\n  last:  {report['last']}")
+            print(f"  numbers not found: {report['missing_numbers'] or 'none'}")
+            if not articles:
+                print("  lines with 'art' as extracted:")
+                for sample in law.heading_samples(text):
+                    print(f"    {sample}")
+        return 0
+    try:
+        counts = law.build_index(index, sources, law.OllamaEmbedder())
+    except ValueError as exc:
+        print(f"index not written: {exc}")
+        return 1
+    except (RuntimeError, httpx.HTTPError) as exc:
+        print(f"AI not available: {exc}")
+        return 1
+    for name, count in counts.items():
+        print(f"{name}: {count} articles indexed")
+    print(f"index written to {index}")
+    return 0
+
+
+def run_law(question: str, index: Path, model_name: str | None) -> int:
+    from lupa_publica import law
+
+    try:
+        law_index = law.LawIndex.open(index, law.OllamaEmbedder())
+        model = OllamaModel(
+            model=model_name or os.environ.get("LUPA_LAW_MODEL", law.DEFAULT_LAW_MODEL)
+        )
+        result = law.answer(question, law_index, model)
+    except FileNotFoundError as exc:
+        print(exc)
+        return 1
+    except (LLMError, RuntimeError, httpx.HTTPError) as exc:
+        print(f"AI not available: {exc}")
+        return 1
+    print(result.text)
+    if "(sin citas)" in result.unverified_citations:
+        print(
+            "\n⚠️  La respuesta NO cita ningún artículo: puede venir de la memoria de la IA. "
+            "No la uses sin leer los artículos de abajo."
+        )
+    wrong = [c for c in result.unverified_citations if c != "(sin citas)"]
+    if wrong:
+        print("\n⚠️  Citas que NO están entre los artículos consultados: " + ", ".join(wrong))
+    print("\nArtículos consultados (texto completo enviado a la IA):")
+    for article in result.sources:
+        print(f"  {article.citation} {article.text[:110]}…")
+    print("\nRespuesta escrita por IA a partir del texto oficial. No es asesoría legal.")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -233,8 +333,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         # Imported here: only this command needs the MCP library.
         from lupa_publica.mcp_server import serve
 
-        serve(args.public_data)
+        serve(args.public_data, args.law_index)
         return 0
+    if args.command == "law-index":
+        return run_law_index(args.pdf, args.index, args.check)
+    if args.command == "law":
+        return run_law(args.question, args.index, args.model)
 
     if args.command == "ingest":
         if args.months < 1:
