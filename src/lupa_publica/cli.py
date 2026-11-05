@@ -1,4 +1,4 @@
-"""Command-line interface: ``lupa ingest``, ``backfill``, ``report``, ``export-public``, ``ask``."""
+"""Command-line interface: ``lupa ingest``, ``backfill``, ``export-public``... (``lupa -h``)."""
 
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from lupa_publica.llm import LLMError, OllamaModel
 from lupa_publica.lock import AlreadyRunningError, exclusive_lock
 from lupa_publica.pipeline import DataPaths, IngestResult, ingest, last_months, month_range
 from lupa_publica.privacy import MissingKeyError
+from lupa_publica.release_check import DEFAULT_MIN_RATIO, check_release, to_markdown
 from lupa_publica.report import build_report, render_markdown
 
 
@@ -120,6 +121,14 @@ def build_parser() -> argparse.ArgumentParser:
     eval_cmd.add_argument("--public-data", type=Path, default=Path("web/public/data"))
     eval_cmd.add_argument("--index", type=Path, default=Path("data/law/law.duckdb"))
     eval_cmd.add_argument("--no-explain", action="store_true", help="ask: skip explanations")
+
+    check_cmd = commands.add_parser(
+        "check-release", help="compare a new export with the published data before releasing"
+    )
+    check_cmd.add_argument("--data", type=Path, default=Path("web/public/data"))
+    check_cmd.add_argument("--previous", type=Path, help="files of the current data release")
+    check_cmd.add_argument("--min-ratio", type=float, default=DEFAULT_MIN_RATIO)
+    check_cmd.add_argument("--summary", type=Path, help="also append the table to this file")
     return parser
 
 
@@ -134,6 +143,16 @@ def run_export(paths: DataPaths, output: Path | None) -> int:
         print(f"{name:<20} {rows:>8,} rows")
     print(f"public datasets written to {out_dir}")
     return 0
+
+
+def run_check_release(args: argparse.Namespace) -> int:
+    check = check_release(args.data, args.previous, args.min_ratio)
+    text = to_markdown(check)
+    print(text)
+    if args.summary is not None:
+        with args.summary.open("a", encoding="utf-8") as summary:
+            summary.write(text)
+    return 0 if check.ok else 1
 
 
 def print_summary(result: IngestResult) -> None:
@@ -379,6 +398,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_report(paths, args.output)
     if args.command == "export-public":
         return run_export(paths, args.output)
+    if args.command == "check-release":
+        return run_check_release(args)
     if args.command == "ask":
         return run_ask(args.question, args.public_data, args.model, not args.no_explain)
     if args.command == "ask-examples":
