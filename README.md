@@ -19,7 +19,10 @@ processes and about US$ 13 billion as of November 2026) and refreshes itself eve
 
 🇪🇨 [Resumen en español](#-en-español)
 
-![Lupa Pública home page: search box, key figures, entities to review first and processes per month](docs/img/home.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/home-dark.png">
+  <img alt="Lupa Pública home page: search box, key figures, entities to review first and processes per month" src="docs/img/home.png">
+</picture>
 
 ---
 
@@ -37,9 +40,29 @@ processes and about US$ 13 billion as of November 2026) and refreshes itself eve
 | 🔄 | **Fresh data every month**, with nobody pressing a button | A scheduled GitHub Actions robot re-downloads the last 24 months, rebuilds and tests everything, and stops itself if the new data looks broken |
 | ✋ | **Right of reply**: any entity can ask for a correction | GitHub issue template, public and logged |
 
-| Province map | Questions in Spanish, answered from the data |
-|---|---|
-| ![Map of Ecuador's provinces colored by number of procurement processes](docs/img/map.png) | ![AI gallery: a question in Spanish, the AI summary and the exact table it came from](docs/img/ask.png) |
+<table>
+  <tr><th>Province map</th><th>Questions in Spanish, answered from the data</th></tr>
+  <tr>
+    <td>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/map-dark.png">
+  <img alt="Map of Ecuador's provinces colored by number of procurement processes" src="docs/img/map.png">
+</picture>
+
+</td>
+    <td>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/ask-dark.png">
+  <img alt="AI gallery: a question in Spanish, the AI summary and the exact table it came from" src="docs/img/ask.png">
+</picture>
+
+</td>
+  </tr>
+</table>
+
+The website follows your system's light or dark mode, and so do these screenshots.
 
 ## Risk signals
 
