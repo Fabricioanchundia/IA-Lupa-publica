@@ -728,6 +728,7 @@ dependencies = [
     { name = "httpx" },
     { name = "numpy" },
     { name = "pydantic" },
+    { name = "sqlglot" },
 ]
 
 [package.dev-dependencies]
@@ -745,6 +746,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "numpy", specifier = ">=2.5.4" },
     { name = "pydantic", specifier = ">=2.14.1" },
+    { name = "sqlglot", specifier = ">=30.25.0" },
 ]
 
 [package.metadata.requires-dev]
