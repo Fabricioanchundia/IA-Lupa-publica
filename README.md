@@ -1,12 +1,184 @@
 # Lupa Pública 🔎
 
-**EN:** Open-source platform that analyzes Ecuador's public procurement data (OCDS, published by SERCOP) to surface risk indicators and answer questions in plain Spanish with AI. Risk indicators are **signals for further review, not accusations of wrongdoing**.
+**Ecuador's public procurement, easy to review.** Lupa Pública turns the open data that
+SERCOP publishes (342,282 procurement processes, about US$ 12.9 billion, Nov 2024 – Oct 2026)
+into a fast search site, entity profiles, a province map, statistically sound **risk
+signals** and an AI that answers questions in plain Spanish, without sending anyone's data
+to a server.
 
-**ES:** Plataforma de código abierto que analiza los datos de compras públicas de Ecuador (OCDS, publicados por el SERCOP) para mostrar indicadores de riesgo y responder preguntas en español con IA. Los indicadores son **señales para investigar, no acusaciones**.
+**🌎 Live site: [fabricioanchundia.github.io/Lupa-publica](https://fabricioanchundia.github.io/Lupa-publica/)**
 
-🚧 Work in progress / En construcción
+[![CI](https://github.com/Fabricioanchundia/Lupa-publica/actions/workflows/ci.yml/badge.svg)](https://github.com/Fabricioanchundia/Lupa-publica/actions/workflows/ci.yml)
+[![web](https://github.com/Fabricioanchundia/Lupa-publica/actions/workflows/web.yml/badge.svg)](https://github.com/Fabricioanchundia/Lupa-publica/actions/workflows/web.yml)
+![License: MIT](https://img.shields.io/badge/code-MIT-blue)
+![Data: CC BY 3.0 EC](https://img.shields.io/badge/data-CC%20BY%203.0%20EC-green)
 
-## Data source / Fuente de datos
-Servicio Nacional de Contratación Pública (SERCOP) — Contrataciones Abiertas Ecuador (OCDS):
-https://datosabiertos.compraspublicas.gob.ec/PLATAFORMA/datos-abiertos
-Data licensed under CC BY 3.0 EC. Code licensed under MIT.
+> Risk signals are **reasons to look closer, never accusations of wrongdoing.** Each one
+> compares an entity with others that buy similar things and has a public methodology.
+
+🇪🇨 [Resumen en español](#-en-español)
+
+---
+
+## What you can do
+
+| | Feature | How it works |
+|---|---|---|
+| 🔍 | **Search every contract** by description, entity or supplier, with filters (province, year, category, procedure, "only with signals") | DuckDB runs **inside the browser** (WebAssembly) on the public datasets: no backend, nothing you search leaves your device |
+| 🏛️ | **Entity profiles**: totals, the three signals explained in one sentence each, concentrated suppliers, largest contracts | Same in-browser queries, linked from every table |
+| 🗺️ | **Province map** for four metrics, with a ranked table | Natural Earth boundaries pre-converted to SVG, no map service |
+| 🚩 | **Review priority**: 12 entities to review first, 62 to review | Leave-one-out baselines, Poisson tail, Benjamini-Hochberg FDR |
+| 🤖 | **Ask in Spanish**: "¿Qué hospitales tienen más contratos de una sola oferta?" | Text-to-SQL with a local open model, two safety locks, and the SQL shown with every answer |
+| 🔌 | **Use it from an AI assistant** (Claude Desktop, IDE agents) | `lupa mcp`: an MCP server with four read-only tools over the public data |
+| ✋ | **Right of reply**: any entity can ask for a correction | GitHub issue template, public and logged |
+
+## Risk signals
+
+| Code | Signal | Source | Methodology |
+|---|---|---|---|
+| R018 | Single bid received in a competitive process | Open Contracting Partnership red flags (Cardinal) | [r018-single-bid.md](docs/indicators/r018-single-bid.md) |
+| R003 | Unusually short submission period | Open Contracting Partnership red flags (Cardinal) | [r003-short-period.md](docs/indicators/r003-short-period.md) |
+| LP01 | One supplier wins an unusual share of an entity's contracts in a category | Own | [lp01-supplier-concentration.md](docs/indicators/lp01-supplier-concentration.md) |
+| LP02 | Unusually high unit price (**experimental**, not published) | Own | [lp02-unit-price.md](docs/indicators/lp02-unit-price.md) |
+
+An entity is flagged only when its excess is **both** unlikely to be chance (q < 0.05 after
+correcting for hundreds of comparisons, at least 3 cases) **and** large enough to matter.
+Entities with too little data are labeled "insufficient data", never ranked.
+Details: [docs/indicators](docs/indicators/README.md).
+
+## Architecture
+
+```mermaid
+flowchart LR
+    S[SERCOP open data<br/>OCDS monthly files] -->|lupa backfill / ingest| B[(bronze<br/>raw JSON in DuckDB)]
+    B -->|dbt| SV[(silver<br/>typed tables)]
+    SV -->|dbt| G[(gold<br/>signals + priority)]
+    G -->|lupa export-public<br/>allowlist + privacy guard| P[8 public CSV.gz]
+    P -->|GitHub Release| GH[GitHub Pages<br/>React + DuckDB-WASM]
+    P --> A[lupa ask<br/>Text-to-SQL]
+    O[Ollama<br/>local open model] --> A
+    A -->|lupa ask-examples<br/>reviewed| GH
+    P --> M[lupa mcp<br/>MCP server] --> AI[AI assistants]
+```
+
+- **Medallion layout** in one DuckDB file; transformations in **dbt** with unit tests,
+  data tests and a privacy test that fails the build if a person's identity leaks.
+- **Static site**: React 19 + Vite + TypeScript, DuckDB-WASM, strict Content Security
+  Policy (own files only). Data files travel as a GitHub Release, not in git.
+- **AI without a server**: questions are answered by an open model running locally
+  (Ollama, `qwen2.5-coder:7b`). The website shows a reviewed gallery whose SQL each visitor
+  can re-run in the browser. Why: [ADR-0006](docs/adr/0006-text-to-sql-with-local-model.md).
+
+Every important decision has an [Architecture Decision Record](docs/adr/README.md).
+
+## Privacy and AI safety
+
+- **Natural persons are never published by name or ID number.** Suppliers who are people
+  appear as `Persona #` plus 6 characters of a keyed hash (HMAC-SHA256, secret key kept
+  out of git) ([ADR-0004](docs/adr/0004-supplier-privacy.md)).
+- **Public export allowlist.** Only listed columns are exported; ID numbers in free text
+  are masked; every value is scanned for personal identifiers and the export fails if
+  one is found.
+- **Two locks on AI-written SQL.** (1) The SQL is parsed, never trusted: one read-only
+  `SELECT` over the public tables only, no file or settings functions, row limit.
+  (2) It runs in an in-memory database that holds only public data and is locked
+  (no file or network access, settings frozen, time limit).
+- **Numbers come from the data, not the model.** The AI's summary is labeled as such, and
+  numbers in it that are not in the result are flagged.
+
+## Run it yourself
+
+Requirements: Python 3.12 + [uv](https://docs.astral.sh/uv/), Node 22, and optionally
+[Ollama](https://ollama.com) for the AI.
+
+```bash
+git clone https://github.com/Fabricioanchundia/Lupa-publica && cd Lupa-publica
+uv sync
+cp .env.example .env    # then set LUPA_PSEUDONYM_KEY:
+python -c "import secrets; print(secrets.token_hex(32))"
+set -a && source .env && set +a
+
+uv run lupa backfill --from 2024-11 --to 2026-10       # download SERCOP data (large)
+uv run dbt build --project-dir dbt --profiles-dir dbt  # silver + gold + tests
+uv run lupa export-public                              # public datasets -> web/public/data
+
+cd web && npm ci && npm run dev                        # http://localhost:5173
+
+# AI (optional, free, local)
+ollama pull qwen2.5-coder:7b
+uv run lupa ask "¿Cuánto se gastó en Manabí en 2025?"
+
+# MCP server for AI assistants (stdio); try it in the browser with MCP Inspector
+npx @modelcontextprotocol/inspector uv run lupa mcp
+```
+
+Quality gates: `uv run ruff check . && uv run mypy src && uv run pytest` (strict typing,
+security lint rules, 120+ tests), `dbt build` on a synthetic fixture in CI, pre-commit with
+secret scanning.
+
+## Project structure
+
+```
+src/lupa_publica/   ingestion, export, privacy, Text-to-SQL (ask, sql_guard, semantic, llm), MCP server
+dbt/                staging → silver → gold models, macros, unit and data tests
+web/                React app (pages, in-browser DuckDB, map, AI gallery)
+docs/               ADRs, indicator methodologies, data model, coverage report
+tests/              pytest suite (fake LLM, locked database, privacy guards)
+```
+
+## Status
+
+| Phase | | Status |
+|---|---|---|
+| 0–4 | Ingestion, bronze/silver data model, privacy | ✅ Done |
+| 5 | Risk signals and review priority | ✅ Done |
+| 6 | Public website | ✅ Live |
+| 7 | Questions in Spanish (Text-to-SQL, local model, AI gallery) | ✅ Done |
+| 8 | MCP server (AI assistants can query the data) and RAG over procurement law | 🚧 In progress |
+| 9 | AI evaluation set (accuracy, refusals, hallucinated numbers) | ⏳ Planned |
+| 10 | Monthly automatic refresh | ⏳ Planned |
+
+Known limits: SERCOP titles are often just codes, so word search finds fewer matches than
+it could (item descriptions are next); the single-bid and short-period signals depend on
+what SERCOP reports; LP02 stays experimental until similar products can be matched
+reliably.
+
+## Data and license
+
+Data: Servicio Nacional de Contratación Pública (SERCOP),
+[Contrataciones Abiertas Ecuador (OCDS)](https://datosabiertos.compraspublicas.gob.ec/PLATAFORMA/datos-abiertos),
+licensed under CC BY 3.0 EC. Province boundaries: Natural Earth (public domain).
+Code: [MIT](LICENSE). Found a mistake? [Ask for a correction](https://github.com/Fabricioanchundia/Lupa-publica/issues/new?template=correccion.yml).
+
+Built by **Fabricio Anchundia** (Manta, Ecuador).
+
+---
+
+## 🇪🇨 En español
+
+**Lupa Pública hace fácil revisar la contratación pública del Ecuador.** Toma los datos
+abiertos del SERCOP (342.282 procesos, unos US$ 12,9 mil millones, de noviembre 2024 a
+octubre 2026) y los convierte en una página web con:
+
+- **Buscador de contratos** con filtros (provincia, año, categoría, procedimiento).
+- **Ficha de cada institución**, con sus señales explicadas en palabras simples.
+- **Mapa por provincia.**
+- **Prioridad de revisión:** 12 entidades para revisar primero.
+- **Preguntas en español con IA**, mostrando siempre la consulta usada.
+
+**Las señales no son acusaciones.** Comparan a cada institución con otras que compran
+cosas parecidas, solo cuentan cuando la diferencia es grande y difícilmente casual, y cada
+una tiene su metodología publicada.
+
+**Privacidad:** las personas naturales nunca aparecen con su nombre ni su cédula, solo como
+"Persona #" y un código. Todo se calcula en el navegador de quien visita la página: no hay
+servidor, ni cookies, ni seguimiento.
+
+**La IA no inventa números:** traduce la pregunta a una consulta, dos candados revisan que
+solo pueda leer datos públicos, y los números salen de los datos. Corre en una computadora
+propia con un modelo abierto, sin costo.
+
+**¿Algo está mal?** Cualquier institución puede
+[pedir una corrección](https://github.com/Fabricioanchundia/Lupa-publica/issues/new?template=correccion.yml).
+
+👉 **[Abrir Lupa Pública](https://fabricioanchundia.github.io/Lupa-publica/)**
