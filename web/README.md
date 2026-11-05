@@ -42,8 +42,20 @@ One-time setup: Settings → Pages → Source: **GitHub Actions**.
 | `#/contratos` | Search and filters over every process; `?q=`, `?provincia=`, `?entidad=` |
 | `#/entidades` | Entity search; `#/entidades/<buyer_id>` is the entity profile |
 | `#/mapa` | Provinces coloured by a chosen metric, with a ranked table |
-| `#/preguntar` | Placeholder for Phase 7 (questions in Spanish) |
+| `#/preguntar` | AI gallery: reviewed questions answered by the local model, with SQL and a live re-run |
 | `#/acerca` | About, data source, privacy, and how to ask for a correction (right of reply) |
+
+## AI gallery (Phase 7, free)
+
+A hosted model would cost money for every visitor, so the questions in
+`web/ask-examples.txt` are answered on the developer's computer with Ollama and saved to
+`web/src/askExamples.json` (privacy-checked). Review every answer before committing:
+
+```bash
+uv run lupa ask-examples          # needs Ollama running and web/public/data exported
+```
+
+Visitors can re-run each example's SQL in their own browser with "Comprobar en vivo".
 
 ## Rules
 

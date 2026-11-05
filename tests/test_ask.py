@@ -15,6 +15,7 @@ from lupa_publica.ask import (
     open_public_data,
     parse_number,
     run_query,
+    show,
     unverified_numbers,
 )
 from lupa_publica.export import export_public
@@ -199,3 +200,23 @@ def test_explanation_with_an_invented_number_is_marked(con: duckdb.DuckDBPyConne
 
     assert answer.rows == [(2,)]
     assert answer.unverified_numbers == ["7"]
+
+
+def test_list_numbers_are_not_flagged() -> None:
+    rows = [("HOSPITAL A", 121), ("HOSPITAL B", 69), ("HOSPITAL C", 67)]
+    text = "Los hospitales son:\n\n1. Hospital A: 121\n2. Hospital B: 69\n3. Hospital C: 67"
+    assert unverified_numbers(text, rows) == []
+
+
+@pytest.mark.parametrize(
+    ("value", "text"),
+    [(351703797.68000007, "351703797.68"), (2.5, "2.5"), (3.0, "3"), (7, "7"), (None, "")],
+)
+def test_values_are_shown_rounded(value: object, text: str) -> None:
+    assert show(value) == text
+
+
+def test_schema_points_signal_levels_to_review_priority(con: duckdb.DuckDBPyConnection) -> None:
+    # A real mistake of the model: it looked for r018_level in r018_buyers.
+    schema = describe_schema(con)
+    assert "use review_priority.r018_level" in schema

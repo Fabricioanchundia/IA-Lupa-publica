@@ -56,7 +56,9 @@ TABLES: dict[str, TableDoc] = {
         },
     ),
     "review_priority": TableDoc(
-        "One row per entity: how its risk signals compare with similar entities.",
+        "One row per entity: how its risk signals compare with similar entities. "
+        "This is the ONLY table with signal levels (r018_level, r003_level, lp01_level) "
+        "and review_priority.",
         {
             "buyer_id": "entity id",
             "buyer_name": "entity name in CAPITALS",
@@ -77,7 +79,8 @@ TABLES: dict[str, TableDoc] = {
         },
     ),
     "r018_buyers": TableDoc(
-        "Single-bid signal (R018) per entity, with its statistics.",
+        "Single-bid signal (R018) per entity, with its statistics. It has NO level column: "
+        "for 'high'/'medium' levels use review_priority.r018_level.",
         {
             "buyer_id": "entity id",
             "buyer_name": "entity name in CAPITALS",
@@ -94,7 +97,8 @@ TABLES: dict[str, TableDoc] = {
         },
     ),
     "r003_buyers": TableDoc(
-        "Short bidding period signal (R003) per entity, with its statistics.",
+        "Short bidding period signal (R003) per entity, with its statistics. It has NO level "
+        "column: for 'high'/'medium' levels use review_priority.r003_level.",
         {
             "buyer_id": "entity id",
             "buyer_name": "entity name in CAPITALS",

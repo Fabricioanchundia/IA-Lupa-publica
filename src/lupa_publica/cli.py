@@ -8,7 +8,8 @@ from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
 
-from lupa_publica.ask import Answer, ask, open_public_data
+from lupa_publica.ask import Answer, ask, open_public_data, show
+from lupa_publica.ask_gallery import build_gallery, read_questions, write_gallery
 from lupa_publica.export import PublicDataError, export_public
 from lupa_publica.extract import Month
 from lupa_publica.llm import LLMError, OllamaModel
@@ -65,6 +66,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--model", help="Ollama model (default: $LUPA_LLM_MODEL or qwen2.5-coder:7b)"
     )
     ask_cmd.add_argument("--no-explain", action="store_true", help="only the SQL and the table")
+
+    gallery_cmd = commands.add_parser(
+        "ask-examples", help="answer a list of questions for the website's AI gallery"
+    )
+    gallery_cmd.add_argument(
+        "--questions",
+        type=Path,
+        default=Path("web/ask-examples.txt"),
+        help="one question per line (default: web/ask-examples.txt)",
+    )
+    gallery_cmd.add_argument(
+        "--output",
+        type=Path,
+        default=Path("web/src/askExamples.json"),
+        help="default: web/src/askExamples.json",
+    )
+    gallery_cmd.add_argument("--public-data", type=Path, default=Path("web/public/data"))
+    gallery_cmd.add_argument("--model", help="Ollama model (default: qwen2.5-coder:7b)")
     return parser
 
 
@@ -118,12 +137,12 @@ def print_answer(answer: Answer, max_rows: int = 20) -> None:
         return
     print(f"SQL ({answer.attempts} intento{'s' if answer.attempts > 1 else ''}):\n{answer.sql}\n")
     widths = [
-        max([len(c)] + [len(str(r[i])) for r in answer.rows[:max_rows]])
+        max([len(c)] + [len(show(r[i])) for r in answer.rows[:max_rows]])
         for i, c in enumerate(answer.columns)
     ]
     print("  ".join(c.ljust(w) for c, w in zip(answer.columns, widths, strict=True)))
     for row in answer.rows[:max_rows]:
-        print("  ".join(str(v).ljust(w) for v, w in zip(row, widths, strict=True)))
+        print("  ".join(show(v).ljust(w) for v, w in zip(row, widths, strict=True)))
     if len(answer.rows) > max_rows:
         print(f"... {len(answer.rows) - max_rows} filas más")
     if answer.explanation:
@@ -154,6 +173,39 @@ def run_ask(question: str, data_dir: Path, model_name: str | None, explain: bool
     return 0 if answer.ok or answer.refusal else 1
 
 
+def run_gallery(questions_file: Path, output: Path, data_dir: Path, model_name: str | None) -> int:
+    try:
+        questions = read_questions(questions_file)
+        con = open_public_data(data_dir)
+    except FileNotFoundError as exc:
+        print(exc)
+        return 1
+    model = OllamaModel(model=model_name)
+    try:
+        gallery, report = build_gallery(
+            questions,
+            model,
+            con,
+            model.model,
+            progress=lambda n, total, q: print(f"[{n}/{total}] {q}", flush=True),
+        )
+    except LLMError as exc:
+        print(f"AI not available: {exc}")
+        return 1
+    finally:
+        con.close()
+    try:
+        write_gallery(gallery, output)
+    except PublicDataError as exc:
+        print(f"gallery refused: {exc}")
+        return 1
+    print(f"\n{report.answered} answered, {report.refused} declined, {len(report.failed)} failed")
+    for failure in report.failed:
+        print(f"  FAILED (not published): {failure}")
+    print(f"written to {output}. Review every answer before you commit it.")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -170,6 +222,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_export(paths, args.output)
     if args.command == "ask":
         return run_ask(args.question, args.public_data, args.model, not args.no_explain)
+    if args.command == "ask-examples":
+        return run_gallery(args.questions, args.output, args.public_data, args.model)
 
     if args.command == "ingest":
         if args.months < 1:

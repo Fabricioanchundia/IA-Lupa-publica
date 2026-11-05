@@ -91,7 +91,8 @@ Spanish, in 2 to 4 sentences.
 - Do not count rows yourself: when you say how many there are, use the row count given.
 - Copy names exactly as written (you may change CAPITALS to normal case); do not
   translate or expand abbreviations.
-- Write amounts like 'US$ 1.234.567'. If the result is empty, say that no data matched.
+- Round amounts to whole dollars and write them like 'US$ 1.234.567'. If the result is
+  empty, say that no data matched.
 - Signals are reasons to look closer, never accusations: use neutral words.
 """
 
@@ -171,9 +172,18 @@ def sql_messages(schema: str, question: str) -> list[Message]:
     return messages
 
 
+def show(value: object) -> str:
+    """A value as text; decimals rounded to 2 (sums of dollars come out as 351703797.68000007)."""
+    if value is None:
+        return ""
+    if isinstance(value, float):
+        return f"{value:.2f}".rstrip("0").rstrip(".") if value % 1 else f"{value:.0f}"
+    return str(value)
+
+
 def as_csv(columns: Sequence[str], rows: Sequence[tuple[object, ...]]) -> str:
     lines = [",".join(columns)]
-    lines += [",".join("" if v is None else str(v) for v in row) for row in rows]
+    lines += [",".join(show(v) for v in row) for row in rows]
     return "\n".join(lines)
 
 
@@ -223,6 +233,7 @@ def ask(
 
 
 NUMBER = re.compile(r"\d[\d.,]*\d|\d")
+LIST_MARKER = re.compile(r"^\s*\d+[.)]\s", flags=re.MULTILINE)
 
 
 def parse_number(token: str) -> float | None:
@@ -260,6 +271,8 @@ def unverified_numbers(text: str, rows: Sequence[tuple[object, ...]], extra: str
                 known += [n for t in NUMBER.findall(value) if (n := parse_number(t)) is not None]
     known += [n for t in NUMBER.findall(extra) if (n := parse_number(t)) is not None]
     problems: list[str] = []
+    # "1. Hospital ..." list numbers are not data.
+    text = LIST_MARKER.sub("", text)
     for token in NUMBER.findall(text):
         value = parse_number(token)
         if value is None:

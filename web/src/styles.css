@@ -292,3 +292,30 @@ td.desc { min-width: 260px; }
 .about .grid-2 { margin-top: 20px; }
 .about h2 { margin: 0; font-size: 17px; font-weight: 750; }
 .about .contact { border-color: color-mix(in srgb, var(--brand) 55%, var(--rule)); }
+
+/* ---------- Ask (AI gallery) ---------- */
+.how { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 10px; padding: 0; margin: 18px 0; list-style: none; counter-reset: step; }
+.how li { counter-increment: step; background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; padding: 12px 14px 12px 46px; position: relative; font-size: 14px; color: var(--muted); }
+.how li::before { content: counter(step); position: absolute; left: 14px; top: 12px; width: 22px; height: 22px; border-radius: 50%; background: var(--side); color: var(--brand); font-weight: 800; font-size: 13px; display: grid; place-items: center; }
+.how strong { color: var(--ink); }
+.ask-layout { display: grid; grid-template-columns: minmax(240px, 0.8fr) minmax(0, 2fr); gap: 16px; align-items: start; }
+.ask-list { padding: 12px; position: sticky; top: 16px; }
+.ask-list input { width: 100%; font: inherit; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--bg); color: var(--ink); }
+.ask-list ul { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 2px; max-height: 60vh; overflow: auto; }
+.ask-list button { width: 100%; text-align: left; font: inherit; font-size: 14px; background: none; border: 0; border-radius: 8px; padding: 8px 10px; color: var(--ink); cursor: pointer; }
+.ask-list button:hover { background: var(--bg); }
+.ask-list button[aria-current="true"] { background: var(--side); color: var(--side-ink); }
+.answer h2 { margin: 2px 0 14px; font-size: 21px; font-weight: 800; }
+.eyebrow-q { margin: 0 !important; color: var(--muted); font-size: 12.5px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.04em; }
+.summary { background: color-mix(in srgb, var(--accent) 8%, var(--panel)); border-left: 4px solid var(--accent); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
+.summary p { margin: 0 0 6px; white-space: pre-line; }
+.summary small { display: block; color: var(--muted); font-size: 12.5px; }
+.summary .warn { color: var(--p-high); margin-top: 4px; }
+.refusal { background: var(--p-none-bg); border-radius: 10px; padding: 14px 16px; }
+.refusal p { margin: 6px 0 0; }
+.answer .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 14px; }
+.answer .button:disabled { opacity: .7; cursor: default; }
+.sql { margin-top: 14px; }
+.sql summary { cursor: pointer; color: var(--accent); font-size: 14px; }
+.sql pre { background: var(--side); color: var(--side-ink); border-radius: 10px; padding: 12px 14px; overflow-x: auto; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+@media (max-width: 980px) { .ask-layout { grid-template-columns: 1fr; } .ask-list { position: static; } }
