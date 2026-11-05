@@ -11,3 +11,4 @@
 | [0007](0007-mcp-server-over-public-data.md) | An MCP server over the public data | Accepted |
 | [0008](0008-law-rag.md) | Answers about procurement law with retrieval (RAG) | Accepted |
 | [0009](0009-ai-evaluation.md) | Evaluating the AI with fixed question sets | Accepted |
+| [0010](0010-monthly-refresh-on-github-actions.md) | Monthly data refresh on GitHub Actions | Accepted |

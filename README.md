@@ -31,6 +31,7 @@ to a server.
 | 🤖 | **Ask in Spanish**: "¿Qué hospitales tienen más contratos de una sola oferta?" | Text-to-SQL with a local open model, two safety locks, and the SQL shown with every answer |
 | 📚 | **Ask about procurement law**: answers that cite the exact article of the LOSNCP or its regulation | RAG: 562 articles embedded locally (bge-m3), every citation checked against the articles retrieved |
 | 🔌 | **Use it from an AI assistant** (Claude Desktop, IDE agents) | `lupa mcp`: an MCP server with read-only tools over the public data and the law |
+| 🔄 | **Fresh data every month**, with nobody pressing a button | A scheduled GitHub Actions robot re-downloads the last 24 months, rebuilds and tests everything, and stops itself if the new data looks broken |
 | ✋ | **Right of reply**: any entity can ask for a correction | GitHub issue template, public and logged |
 
 ## Risk signals
@@ -62,6 +63,9 @@ flowchart LR
     P --> M[lupa mcp<br/>MCP server] --> AI[AI assistants]
 ```
 
+- **Monthly robot**: `.github/workflows/refresh.yml` runs the whole pipeline on GitHub
+  Actions (free for public repositories), compares the new export with the published one
+  (`lupa check-release`) and only then publishes. Why: [ADR-0010](docs/adr/0010-monthly-refresh-on-github-actions.md).
 - **Medallion layout** in one DuckDB file; transformations in **dbt** with unit tests,
   data tests and a privacy test that fails the build if a person's identity leaks.
 - **Static site**: React 19 + Vite + TypeScript, DuckDB-WASM, strict Content Security
@@ -165,10 +169,10 @@ Done:
 - ✅ MCP server so AI assistants can query the public data safely
 - ✅ Answers about procurement law citing the exact article (RAG over the LOSNCP and its regulation)
 - ✅ A public evaluation of the AI: accuracy, refusals, citations and invented numbers
+- ✅ Automatic monthly data refresh on GitHub Actions, with a safety check before publishing
 
 Next:
 
-- 🔄 Automatic monthly data refresh
 - 🔎 Search by item descriptions, and merging entities that SERCOP publishes under several IDs
 
 Known limits: SERCOP titles are often just codes, so word search finds fewer matches than
@@ -190,8 +194,8 @@ Built by **Fabricio Anchundia** (Manta, Ecuador).
 ## 🇪🇨 En español
 
 **Lupa Pública hace fácil revisar la contratación pública del Ecuador.** Toma los datos
-abiertos del SERCOP (342.282 procesos, unos US$ 12,9 mil millones, de noviembre 2024 a
-octubre 2026) y los convierte en una página web con:
+abiertos del SERCOP de los últimos 24 meses (unos 340 mil procesos y US$ 13 mil millones)
+y los convierte en una página web con:
 
 - **Buscador de contratos** con filtros (provincia, año, categoría, procedimiento).
 - **Ficha de cada institución**, con sus señales explicadas en palabras simples.
@@ -216,7 +220,8 @@ persona: acierta **17 de 18** preguntas sobre los datos, rechaza **4 de 4** pedi
 debe responder (cédulas, borrar datos, predicciones), y en la ley cita el artículo correcto
 en **8 de 8** preguntas sin inventar ninguna cita.
 
-**Próximamente:** la actualización automática de los datos cada mes.
+**Datos al día:** cada mes un robot de GitHub descarga los datos nuevos del SERCOP, vuelve
+a calcular y probar todo, y solo publica si los datos nuevos se ven bien. No cuesta nada.
 
 **¿Algo está mal?** Cualquier institución puede
 [pedir una corrección](https://github.com/Fabricioanchundia/Lupa-publica/issues/new?template=correccion.yml).
