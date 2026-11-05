@@ -29,7 +29,8 @@ to a server.
 | 🗺️ | **Province map** for four metrics, with a ranked table | Natural Earth boundaries pre-converted to SVG, no map service |
 | 🚩 | **Review priority**: 12 entities to review first, 62 to review | Leave-one-out baselines, Poisson tail, Benjamini-Hochberg FDR |
 | 🤖 | **Ask in Spanish**: "¿Qué hospitales tienen más contratos de una sola oferta?" | Text-to-SQL with a local open model, two safety locks, and the SQL shown with every answer |
-| 🔌 | **Use it from an AI assistant** (Claude Desktop, IDE agents) | `lupa mcp`: an MCP server with four read-only tools over the public data |
+| 📚 | **Ask about procurement law**: answers that cite the exact article of the LOSNCP or its regulation | RAG: 562 articles embedded locally (bge-m3), every citation checked against the articles retrieved |
+| 🔌 | **Use it from an AI assistant** (Claude Desktop, IDE agents) | `lupa mcp`: an MCP server with read-only tools over the public data and the law |
 | ✋ | **Right of reply**: any entity can ask for a correction | GitHub issue template, public and logged |
 
 ## Risk signals
@@ -108,6 +109,11 @@ cd web && npm ci && npm run dev                        # http://localhost:5173
 ollama pull qwen2.5-coder:7b
 uv run lupa ask "¿Cuánto se gastó en Manabí en 2025?"
 
+# Questions about procurement law (put LOSNCP.pdf and RGLOSNCP.pdf in data/law/)
+ollama pull bge-m3 && ollama pull qwen2.5:7b
+uv run lupa law-index
+uv run lupa law "¿Qué es la ínfima cuantía?"
+
 # MCP server for AI assistants (stdio); try it in the browser with MCP Inspector
 npx @modelcontextprotocol/inspector uv run lupa mcp
 ```
@@ -119,7 +125,7 @@ secret scanning.
 ## Project structure
 
 ```
-src/lupa_publica/   ingestion, export, privacy, Text-to-SQL (ask, sql_guard, semantic, llm), MCP server
+src/lupa_publica/   ingestion, export, privacy, Text-to-SQL (ask, sql_guard, semantic, llm), law RAG, MCP server
 dbt/                staging → silver → gold models, macros, unit and data tests
 web/                React app (pages, in-browser DuckDB, map, AI gallery)
 docs/               ADRs, indicator methodologies, data model, coverage report
@@ -135,10 +141,10 @@ Done:
 - ✅ Public website: search, entity profiles, province map, about page with right of reply
 - ✅ Questions in Spanish (Text-to-SQL with a local model) and a reviewed AI gallery
 - ✅ MCP server so AI assistants can query the public data safely
+- ✅ Answers about procurement law citing the exact article (RAG over the LOSNCP and its regulation)
 
 Next:
 
-- 📚 Answers about procurement law, citing the exact article (RAG over the LOSNCP and its regulation)
 - 📏 A public evaluation of the AI: accuracy, refusals and invented numbers
 - 🔄 Automatic monthly data refresh
 - 🔎 Search by item descriptions, and merging entities that SERCOP publishes under several IDs
@@ -183,8 +189,8 @@ servidor, ni cookies, ni seguimiento.
 solo pueda leer datos públicos, y los números salen de los datos. Corre en una computadora
 propia con un modelo abierto, sin costo.
 
-**Próximamente:** respuestas sobre la Ley de Contratación Pública citando el artículo
-exacto, una evaluación pública de la IA y la actualización automática cada mes.
+**Próximamente:** una evaluación pública de la IA y la actualización automática cada mes.
+Ya puede responder preguntas sobre la Ley de Contratación Pública citando el artículo exacto.
 
 **¿Algo está mal?** Cualquier institución puede
 [pedir una corrección](https://github.com/Fabricioanchundia/Lupa-publica/issues/new?template=correccion.yml).
