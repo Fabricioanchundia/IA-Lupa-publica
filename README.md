@@ -126,17 +126,22 @@ docs/               ADRs, indicator methodologies, data model, coverage report
 tests/              pytest suite (fake LLM, locked database, privacy guards)
 ```
 
-## Status
+## Roadmap
 
-| Phase | | Status |
-|---|---|---|
-| 0–4 | Ingestion, bronze/silver data model, privacy | ✅ Done |
-| 5 | Risk signals and review priority | ✅ Done |
-| 6 | Public website | ✅ Live |
-| 7 | Questions in Spanish (Text-to-SQL, local model, AI gallery) | ✅ Done |
-| 8 | MCP server (AI assistants can query the data) and RAG over procurement law | 🚧 In progress |
-| 9 | AI evaluation set (accuracy, refusals, hallucinated numbers) | ⏳ Planned |
-| 10 | Monthly automatic refresh | ⏳ Planned |
+Done:
+
+- ✅ Data pipeline: monthly ingestion, bronze/silver/gold in DuckDB + dbt, privacy by design
+- ✅ Risk signals with statistical tests, and a review priority per entity
+- ✅ Public website: search, entity profiles, province map, about page with right of reply
+- ✅ Questions in Spanish (Text-to-SQL with a local model) and a reviewed AI gallery
+- ✅ MCP server so AI assistants can query the public data safely
+
+Next:
+
+- 📚 Answers about procurement law, citing the exact article (RAG over the LOSNCP and its regulation)
+- 📏 A public evaluation of the AI: accuracy, refusals and invented numbers
+- 🔄 Automatic monthly data refresh
+- 🔎 Search by item descriptions, and merging entities that SERCOP publishes under several IDs
 
 Known limits: SERCOP titles are often just codes, so word search finds fewer matches than
 it could (item descriptions are next); the single-bid and short-period signals depend on
@@ -177,6 +182,9 @@ servidor, ni cookies, ni seguimiento.
 **La IA no inventa números:** traduce la pregunta a una consulta, dos candados revisan que
 solo pueda leer datos públicos, y los números salen de los datos. Corre en una computadora
 propia con un modelo abierto, sin costo.
+
+**Próximamente:** respuestas sobre la Ley de Contratación Pública citando el artículo
+exacto, una evaluación pública de la IA y la actualización automática cada mes.
 
 **¿Algo está mal?** Cualquier institución puede
 [pedir una corrección](https://github.com/Fabricioanchundia/Lupa-publica/issues/new?template=correccion.yml).
