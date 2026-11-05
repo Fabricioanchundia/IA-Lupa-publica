@@ -13,6 +13,7 @@
   --side-ink: #e2ebf2;
   --side-muted: #8ea5b7;
   --side-active: #1b3a53;
+  --hero: #10273a;
   --brand: #f0b429;
   --ink: #0f1d2a;
   --muted: #5a6a78;
@@ -47,6 +48,8 @@
     --side-ink: #dfe8ef;
     --side-muted: #7f95a6;
     --side-active: #15293a;
+    /* A lifted navy, so the hero card stands out from the dark page. */
+    --hero: #12293d;
     --ink: #e5ecf1;
     --muted: #93a3b0;
     --rule: #223039;
@@ -113,7 +116,7 @@ h1, h2, h3 { letter-spacing: -0.015em; }
 .disclaimer { margin-top: 20px; max-width: 70ch; }
 
 /* ---------- Hero (Inicio) ---------- */
-.hero { background: var(--side); color: var(--side-ink); border-radius: 16px; padding: 32px 32px 28px; }
+.hero { background: var(--hero); color: var(--side-ink); border-radius: 16px; padding: 32px 32px 28px; }
 .hero .eyebrow { margin: 0 0 8px; color: var(--brand); font-size: 13px; font-weight: 650; letter-spacing: 0.02em; }
 .hero h1 { margin: 0; font-size: clamp(26px, 3.4vw, 38px); line-height: 1.12; font-weight: 800; max-width: 22ch; }
 .hero .lede { color: var(--side-muted); max-width: 64ch; margin: 12px 0 20px; font-size: 16px; }

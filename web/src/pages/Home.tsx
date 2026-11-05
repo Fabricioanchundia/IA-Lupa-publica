@@ -74,8 +74,9 @@ export default function Home() {
             <a href={href("entidades", "", { prioridad: "review_first" })}>Ver todas</a>
           </header>
           <p className="muted">
-            Instituciones con varias señales o con una señal muy por encima de lo esperado. Además hay{" "}
-            {fmtInt(count("review"))} con una señal.
+            Instituciones con varias señales o con una señal muy por encima de lo esperado.
+            {/* Only once the data is here: before that the count would read "0". */}
+            {data && ` Además hay ${fmtInt(count("review"))} con una señal.`}
           </p>
           <ol className="review-list">
             {data?.first.slice(0, 6).map((r) => (
